@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}JARVIS — Eventos{% endblock %}
+{% block content %}
+<h1>Eventos (últimos 50)</h1>
+
+<table>
+    <thead>
+        <tr><th>Timestamp</th><th>Tipo</th><th>Proyecto</th><th>Agente</th><th>Detalle</th></tr>
+    </thead>
+    <tbody>
+    {% for e in events %}
+    <tr>
+        <td><small>{{ e.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</small></td>
+        <td><span class="badge {{ 'badge-ok' if e.event_type.value == 'observation' else 'badge-warn' if e.event_type.value == 'error' else '' }}">{{ e.event_type.value }}</span></td>
+        <td>{{ e.project or "—" }}</td>
+        <td><small>{{ e.agent_id or "—" }}</small></td>
+        <td><small>{% if e.payload.get('command') %}{{ e.payload.command }}: {{ e.payload.get('question', '')[:60] }}{% elif e.payload.get('response') %}{{ e.payload.response[:60] }}{% else %}{{ (e.payload|string)[:60] }}{% endif %}</small></td>
+    </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

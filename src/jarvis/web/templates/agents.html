@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}JARVIS — Agentes{% endblock %}
+{% block content %}
+<h1>Agentes y Herramientas</h1>
+
+<article>
+    <h3>Agentes ({{ agents|length }})</h3>
+    <table>
+        <thead>
+            <tr><th>ID</th><th>Nombre</th><th>Skills</th><th>Proyectos</th></tr>
+        </thead>
+        <tbody>
+        {% for a in agents %}
+        <tr>
+            <td><code>{{ a.id }}</code></td>
+            <td>{{ a.name }}</td>
+            <td>{{ a.skills|join(", ") }}</td>
+            <td>{{ a.supported_projects|join(", ") if a.supported_projects else "todos" }}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</article>
+
+{% if tools %}
+<article>
+    <h3>Herramientas QA ({{ tools|length }})</h3>
+    <table>
+        <thead>
+            <tr><th>ID</th><th>Nombre</th><th>Descripción</th></tr>
+        </thead>
+        <tbody>
+        {% for t in tools %}
+        <tr>
+            <td><code>{{ t.id }}</code></td>
+            <td>{{ t.name }}</td>
+            <td>{{ t.description }}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</article>
+{% endif %}
+{% endblock %}

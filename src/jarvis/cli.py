@@ -822,5 +822,18 @@ def run(
         console.print(f"[red]Error:[/red] {result.error}")
 
 
+@app.command()
+def serve(
+    host: str = typer.Option("127.0.0.1", "--host", help="Host"),
+    port: int = typer.Option(8000, "--port", help="Puerto"),
+):
+    """Iniciar servidor web con dashboard y API REST."""
+    import uvicorn
+
+    console.print(f"[cyan]JARVIS Web → http://{host}:{port}[/cyan]")
+    console.print("[dim]API docs → /docs  |  Dashboard → /[/dim]")
+    uvicorn.run("jarvis.web.app:app", host=host, port=port, reload=False)
+
+
 if __name__ == "__main__":
     app()

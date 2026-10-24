@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}JARVIS — Memoria{% endblock %}
+{% block content %}
+<h1>Memoria</h1>
+
+<div class="grid">
+    <article class="stat-card">
+        <h2>{{ total }}</h2>
+        <small>Registros totales</small>
+    </article>
+    {% for project, count in counts.items() %}
+    <article class="stat-card">
+        <h2>{{ count }}</h2>
+        <small>{{ project }}</small>
+    </article>
+    {% endfor %}
+</div>
+
+<article>
+    <h3>Buscar en memoria</h3>
+    <form hx-get="/api/v1/memory/search" hx-target="#search-results" hx-indicator="#spinner">
+        <div class="grid">
+            <input type="text" name="q" placeholder="Buscar..." required>
+            <select name="project">
+                <option value="">Todos los proyectos</option>
+                {% for p in projects %}
+                <option value="{{ p }}">{{ p }}</option>
+                {% endfor %}
+            </select>
+            <button type="submit">Buscar</button>
+        </div>
+    </form>
+    <span id="spinner" class="htmx-indicator" aria-busy="true">Buscando...</span>
+    <div id="search-results"></div>
+</article>
+
+<article>
+    <h3>Registros por proyecto</h3>
+    <details>
+        <summary>Ver registros</summary>
+        {% for p in projects %}
+        <h4>{{ p }} ({{ counts.get(p, 0) }})</h4>
+        <div hx-get="/api/v1/memory/list?project={{ p }}&limit=10" hx-trigger="revealed" hx-swap="innerHTML">
+            <p aria-busy="true">Cargando...</p>
+        </div>
+        {% endfor %}
+    </details>
+</article>
+{% endblock %}

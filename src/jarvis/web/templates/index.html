@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}JARVIS — Dashboard{% endblock %}
+{% block content %}
+<h1>Dashboard</h1>
+
+<div class="grid">
+    <article class="stat-card">
+        <h2>{{ metrics.total_events }}</h2>
+        <small>Eventos</small>
+    </article>
+    <article class="stat-card">
+        <h2>{{ metrics.memory_records }}</h2>
+        <small>Memoria</small>
+    </article>
+    <article class="stat-card">
+        <h2>{{ metrics.llm_requests }}</h2>
+        <small>LLM Requests</small>
+    </article>
+    <article class="stat-card">
+        <h2>${{ "%.4f"|format(metrics.llm_cost_usd) }}</h2>
+        <small>Costo LLM (7d)</small>
+    </article>
+</div>
+
+<div class="grid">
+    <article>
+        <h3>Health Checks</h3>
+        <p>{{ healthy_count }}/{{ total_checks }} componentes operativos</p>
+        <table>
+            <thead><tr><th>Componente</th><th>Estado</th><th>Detalle</th></tr></thead>
+            <tbody>
+            {% for c in checks %}
+            <tr>
+                <td>{{ c.component }}</td>
+                <td><span class="badge {{ 'badge-ok' if c.healthy else 'badge-fail' }}">{{ "OK" if c.healthy else "FAIL" }}</span></td>
+                <td>{{ c.detail }}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </article>
+
+    <article>
+        <h3>Proyectos</h3>
+        <table>
+            <thead><tr><th>Proyecto</th><th>Eventos</th></tr></thead>
+            <tbody>
+            {% for project, count in metrics.events_by_project.items() %}
+            <tr><td>{{ project }}</td><td>{{ count }}</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+
+        {% if metrics.agent_metrics %}
+        <h3>Agentes</h3>
+        <table>
+            <thead><tr><th>Agente</th><th>Runs</th><th>Rate</th><th>Avg ms</th></tr></thead>
+            <tbody>
+            {% for a in metrics.agent_metrics %}
+            <tr>
+                <td>{{ a.agent_id }}</td>
+                <td>{{ a.total_runs }}</td>
+                <td>{{ "%.0f"|format(a.success_rate) }}%</td>
+                <td>{{ a.avg_duration_ms }}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        {% endif %}
+    </article>
+</div>
+{% endblock %}

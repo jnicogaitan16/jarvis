@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="dark">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}JARVIS{% endblock %}</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+    <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+    <style>
+        :root { --pico-font-size: 15px; }
+        nav { margin-bottom: 1rem; }
+        .stat-card { text-align: center; padding: 1rem; }
+        .stat-card h2 { margin: 0; font-size: 2rem; }
+        .stat-card small { color: var(--pico-muted-color); }
+        .badge { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.8rem; }
+        .badge-ok { background: #2d6a4f; color: #fff; }
+        .badge-fail { background: #9d0208; color: #fff; }
+        .badge-warn { background: #e85d04; color: #fff; }
+        table { font-size: 0.9rem; }
+        footer { text-align: center; padding: 1rem; color: var(--pico-muted-color); font-size: 0.8rem; }
+    </style>
+</head>
+<body>
+    <nav class="container-fluid">
+        <ul>
+            <li><strong>JARVIS</strong></li>
+        </ul>
+        <ul>
+            <li><a href="/">Dashboard</a></li>
+            <li><a href="/agents">Agentes</a></li>
+            <li><a href="/memory">Memoria</a></li>
+            <li><a href="/events">Eventos</a></li>
+        </ul>
+    </nav>
+    <main class="container">
+        {% block content %}{% endblock %}
+    </main>
+    <footer>JARVIS v{{ version }}</footer>
+</body>
+</html>
