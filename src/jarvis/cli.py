@@ -6,6 +6,7 @@ from typing import Optional
 
 import typer
 from rich.console import Console
+from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.table import Table
 
@@ -22,10 +23,33 @@ app = typer.Typer(
 console = Console()
 
 
-def _get_event_store() -> EventStore:
+def _get_db_path() -> str:
     config = load_global_config()
-    db_path = config.get("database", {}).get("path", "data/jarvis.db")
-    return EventStore(db_path=db_path)
+    return config.get("database", {}).get("path", "data/jarvis.db")
+
+
+def _get_event_store() -> EventStore:
+    return EventStore(db_path=_get_db_path())
+
+
+def _build_router():
+    """Construir LLM Router con providers disponibles."""
+    from jarvis.llm.gemini import GeminiProvider
+    from jarvis.llm.ollama import OllamaProvider
+    from jarvis.llm.router import LLMRouter
+    from jarvis.llm.usage import UsageTracker
+
+    tracker = UsageTracker(db_path=_get_db_path())
+    router = LLMRouter(usage_tracker=tracker)
+
+    ollama = OllamaProvider()
+    router.register(ollama)
+
+    gemini = GeminiProvider()
+    if gemini.is_available():
+        router.register(gemini)
+
+    return router, tracker
 
 
 @app.command()
@@ -34,6 +58,8 @@ def ask(
     project: str = typer.Option("personal", "--project", "-p", help="Contexto de proyecto"),
 ):
     """Hacer una pregunta a JARVIS."""
+    from jarvis.llm.base import LLMRequest
+
     store = _get_event_store()
     ctx = load_project_context(project)
 
@@ -43,25 +69,67 @@ def ask(
         project=project,
     )
 
-    # Fase 1: respuesta basada en contexto de proyecto (sin LLM aún)
-    console.print(
-        Panel(
-            f"[bold]Proyecto:[/bold] {ctx.display_name}\n"
-            f"[bold]Providers:[/bold] {', '.join(sorted(ctx.allowed_providers))}\n"
-            f"[bold]Cloud:[/bold] {'Sí' if ctx.allow_cloud else 'No'}\n\n"
-            f"Pregunta recibida: [italic]{question}[/italic]\n\n"
-            "[dim]LLM no disponible aún (Fase 2). Evento registrado.[/dim]",
-            title="JARVIS",
-            border_style="blue",
-        )
-    )
+    router, tracker = _build_router()
+    available = router.available_providers()
 
-    store.emit(
-        EventType.OBSERVATION,
-        payload={"response": "LLM pendiente (Fase 2)", "project": project},
+    if not any(p.available for p in available):
+        console.print(
+            Panel(
+                f"[bold]Proyecto:[/bold] {ctx.display_name}\n\n"
+                f"Pregunta: [italic]{question}[/italic]\n\n"
+                "[yellow]Sin proveedores LLM disponibles.[/yellow]\n"
+                "[dim]Verifica que Ollama esté corriendo o configura GEMINI_API_KEY.[/dim]",
+                title="JARVIS",
+                border_style="yellow",
+            )
+        )
+        store.emit(
+            EventType.OBSERVATION,
+            payload={"response": "Sin proveedores disponibles", "project": project},
+            project=project,
+        )
+        store.close()
+        tracker.close()
+        return
+
+    request = LLMRequest(
+        prompt=question,
+        system="Eres JARVIS, un asistente de IA personal. Responde de forma concisa y útil en español.",
         project=project,
     )
+
+    try:
+        response = router.generate(request, ctx)
+        console.print(
+            Panel(
+                Markdown(response.content),
+                title=f"JARVIS — {response.provider}:{response.model}",
+                subtitle=f"{response.total_tokens} tokens · {response.latency_ms}ms · ${response.cost_usd:.4f}",
+                border_style="blue",
+            )
+        )
+        store.emit(
+            EventType.OBSERVATION,
+            payload={
+                "response": response.content[:200],
+                "provider": response.provider,
+                "model": response.model,
+                "tokens": response.total_tokens,
+                "latency_ms": response.latency_ms,
+                "cost_usd": response.cost_usd,
+            },
+            project=project,
+        )
+    except RuntimeError as e:
+        console.print(f"[red]Error:[/red] {e}")
+        store.emit(
+            EventType.ERROR,
+            payload={"error": str(e), "project": project},
+            project=project,
+        )
+
     store.close()
+    tracker.close()
 
 
 @app.command()
@@ -77,13 +145,63 @@ def status():
     table.add_row("Versión", __version__)
     table.add_row("Eventos totales", str(store.count()))
     table.add_row("Proyectos configurados", ", ".join(projects) if projects else "ninguno")
-    table.add_row("LLM (Ollama)", "[dim]Pendiente Fase 2[/dim]")
-    table.add_row("LLM (Gemini)", "[dim]Pendiente Fase 2[/dim]")
+
+    # Check LLM providers
+    router, tracker = _build_router()
+    for ps in router.available_providers():
+        label = f"LLM ({ps.provider})"
+        if ps.available:
+            table.add_row(label, f"[green]{ps.model}[/green]")
+        else:
+            table.add_row(label, f"[dim]{ps.error or 'No disponible'}[/dim]")
+
     table.add_row("Memoria", "[dim]Pendiente Fase 3[/dim]")
     table.add_row("Agentes", "[dim]Pendiente Fase 4[/dim]")
 
     console.print(table)
     store.close()
+    tracker.close()
+
+
+@app.command()
+def costs(
+    days: int = typer.Option(7, "--days", "-d", help="Período en días"),
+):
+    """Ver resumen de costos de LLM."""
+    from jarvis.llm.usage import UsageTracker
+
+    tracker = UsageTracker(db_path=_get_db_path())
+    summary = tracker.get_summary(days=days)
+    total = tracker.get_total_cost(days=days)
+
+    if not summary:
+        console.print(f"[dim]Sin uso de LLM en los últimos {days} días.[/dim]")
+        tracker.close()
+        return
+
+    table = Table(title=f"Costos LLM — últimos {days} días")
+    table.add_column("Provider", style="cyan")
+    table.add_column("Requests", justify="right")
+    table.add_column("Tokens", justify="right")
+    table.add_column("Costo", justify="right", style="green")
+    table.add_column("Errores", justify="right", style="red")
+    table.add_column("Latencia avg", justify="right", style="dim")
+
+    for row in summary:
+        table.add_row(
+            row["provider"],
+            str(row["requests"]),
+            f"{row['tokens']:,}",
+            f"${row['cost_usd']:.4f}",
+            str(row["errors"]),
+            f"{row['avg_latency_ms']}ms",
+        )
+
+    table.add_section()
+    table.add_row("Total", "", "", f"[bold]${total:.4f}[/bold]", "", "")
+
+    console.print(table)
+    tracker.close()
 
 
 @app.command()
