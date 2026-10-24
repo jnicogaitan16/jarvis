@@ -70,6 +70,10 @@ def _build_orchestrator():
     except Exception:
         pass
 
+    # Registrar KameCol Agent
+    from jarvis.agents.business.kamecol_agent import KameColAgent
+    registry.register(KameColAgent())
+
     store = _get_event_store()
     mem = _get_memory_manager()
 
