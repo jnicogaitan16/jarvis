@@ -853,6 +853,143 @@ def serve(
 
 
 @app.command()
+def telegram():
+    """Iniciar bot de Telegram para control remoto desde iPhone."""
+    from jarvis.telegram.bot import create_bot
+
+    console.print("[cyan]JARVIS Telegram Bot iniciando...[/cyan]")
+    console.print("[dim]Envía /start al bot en Telegram para comenzar.[/dim]")
+
+    bot = create_bot()
+    bot.run_polling()
+
+
+@app.command()
+def chat(
+    project: str = typer.Option("personal", "--project", "-p", help="Proyecto"),
+):
+    """Modo chat interactivo con JARVIS."""
+    from jarvis.llm.base import LLMRequest
+
+    store = _get_event_store()
+    ctx = load_project_context(project)
+    router, tracker = _build_router()
+    mem = _get_memory_manager()
+
+    available = router.available_providers()
+    if not any(p.available for p in available):
+        console.print("[yellow]Sin proveedores LLM. Verifica Ollama o GEMINI_API_KEY.[/yellow]")
+        return
+
+    provider_name = next((p.model for p in available if p.available), "?")
+    console.print(
+        Panel(
+            f"[bold]Proyecto:[/bold] {ctx.display_name}  |  "
+            f"[bold]Modelo:[/bold] {provider_name}\n"
+            "[dim]Escribe tu mensaje. Comandos: /proyecto <id>, /memoria <query>, /salir[/dim]",
+            title="JARVIS Chat",
+            border_style="blue",
+        )
+    )
+
+    history: list[dict] = []
+
+    while True:
+        try:
+            user_input = console.input("[bold cyan]Nico >[/bold cyan] ").strip()
+        except (EOFError, KeyboardInterrupt):
+            console.print("\n[dim]Hasta luego, Nico.[/dim]")
+            break
+
+        if not user_input:
+            continue
+
+        # Comandos especiales
+        if user_input.lower() in ("/salir", "/exit", "/quit", "/q"):
+            console.print("[dim]Hasta luego, Nico.[/dim]")
+            break
+
+        if user_input.lower().startswith("/proyecto "):
+            new_project = user_input.split(" ", 1)[1].strip()
+            ctx = load_project_context(new_project)
+            project = new_project
+            console.print(f"[cyan]Proyecto cambiado a: {ctx.display_name}[/cyan]")
+            continue
+
+        if user_input.lower().startswith("/memoria "):
+            query = user_input.split(" ", 1)[1].strip()
+            results = mem.search(query, project=project, limit=5)
+            if results:
+                for rec, score in results:
+                    console.print(f"  [dim][{rec.source}][/dim] {rec.content[:120]}")
+            else:
+                console.print("  [dim]Sin resultados.[/dim]")
+            continue
+
+        if user_input.lower() == "/status":
+            console.print(f"  Proyecto: {ctx.display_name} | Memoria: {mem.count(project)} registros")
+            continue
+
+        # Buscar contexto de memoria
+        memory_context = mem.get_context_for_prompt(user_input, project=project)
+
+        # Construir historial para el prompt
+        system_prompt = (
+            "Eres JARVIS, el asistente personal de Nico Gaitán. "
+            "Responde de forma directa, práctica y en español. "
+            "Usa trato informal pero profesional. "
+            f"Proyecto actual: {ctx.display_name}."
+        )
+        if memory_context:
+            system_prompt += f"\n\n{memory_context}"
+
+        # Incluir últimos mensajes como contexto conversacional
+        conversation = ""
+        for msg in history[-6:]:  # Últimos 3 intercambios
+            conversation += f"Usuario: {msg['user']}\nAsistente: {msg['assistant']}\n\n"
+
+        prompt = conversation + f"Usuario: {user_input}\nAsistente:"
+
+        request = LLMRequest(
+            prompt=prompt,
+            system=system_prompt,
+            project=project,
+        )
+
+        store.emit(
+            EventType.ACTION,
+            payload={"command": "chat", "message": user_input, "project": project},
+            project=project,
+        )
+
+        try:
+            response = router.generate(request, ctx)
+            console.print(f"\n[bold green]JARVIS >[/bold green] {response.content}")
+            console.print(
+                f"[dim]  {response.provider}:{response.model} · "
+                f"{response.total_tokens} tokens · {response.latency_ms}ms[/dim]\n"
+            )
+
+            history.append({"user": user_input, "assistant": response.content})
+
+            store.emit(
+                EventType.OBSERVATION,
+                payload={
+                    "response": response.content[:200],
+                    "provider": response.provider,
+                    "tokens": response.total_tokens,
+                },
+                project=project,
+            )
+        except RuntimeError as e:
+            console.print(f"[red]Error:[/red] {e}\n")
+
+    store.close()
+    tracker.close()
+    mem.close()
+
+
+@app.command()
 def models():
     """Listar perfiles de modelos LLM disponibles."""
     from jarvis.llm.model_selector import ModelSelector
