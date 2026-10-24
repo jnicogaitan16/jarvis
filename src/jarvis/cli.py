@@ -439,17 +439,34 @@ def work_item(
 
 @app.command("seed-knowledge")
 def seed_knowledge_cmd(
-    project: str = typer.Option("integratepie", "--project", "-p", help="Proyecto"),
+    project: str = typer.Option("all", "--project", "-p", help="Proyecto (o 'all')"),
 ):
-    """Cargar knowledge base de un proyecto en memoria."""
+    """Cargar knowledge base de proyectos y perfil personal en memoria."""
     mem = _get_memory_manager()
+    total = 0
 
-    if project == "integratepie":
-        from jarvis.integrations.pie_knowledge import seed_knowledge
-        added = seed_knowledge(mem)
-        console.print(f"[green]IntegratePIE:[/green] {added} registros agregados a memoria.")
+    if project in ("all", "personal"):
+        from jarvis.integrations.personal_knowledge import seed_profile
+        added = seed_profile(mem)
+        total += added
+        console.print(f"[green]Perfil personal:[/green] {added} registros")
+
+    if project in ("all", "integratepie"):
+        from jarvis.integrations.pie_knowledge import seed_knowledge as seed_pie
+        added = seed_pie(mem)
+        total += added
+        console.print(f"[green]IntegratePIE:[/green] {added} registros")
+
+    if project in ("all", "kamecol"):
+        from jarvis.integrations.kamecol_knowledge import seed_knowledge as seed_kc
+        added = seed_kc(mem)
+        total += added
+        console.print(f"[green]KameCol:[/green] {added} registros")
+
+    if total == 0:
+        console.print("[dim]Sin registros nuevos (ya estaban cargados).[/dim]")
     else:
-        console.print(f"[yellow]Sin knowledge base disponible para '{project}'.[/yellow]")
+        console.print(f"\n[bold green]Total: {total} registros agregados.[/bold green]")
 
     mem.close()
 
