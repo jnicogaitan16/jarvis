@@ -404,6 +404,52 @@ def analyze_pr(
     mem.close()
 
 
+@app.command("work-item")
+def work_item(
+    wi_id: int = typer.Argument(help="ID del Work Item"),
+):
+    """Consultar un work item de Azure DevOps."""
+    from jarvis.integrations.azure_devops import AzureDevOpsExtended
+
+    client = AzureDevOpsExtended()
+    if not client.is_configured:
+        console.print("[yellow]Azure DevOps no configurado.[/yellow] Configura AZDO_PAT, AZDO_ORG_URL, AZDO_PROJECT.")
+        return
+
+    wi = client.get_work_item(wi_id)
+    if not wi:
+        console.print(f"[red]Work item #{wi_id} no encontrado.[/red]")
+        return
+
+    console.print(Panel(
+        f"[bold]Tipo:[/bold] {wi.work_item_type}\n"
+        f"[bold]Estado:[/bold] {wi.state}\n"
+        f"[bold]Asignado:[/bold] {wi.assigned_to or '—'}\n"
+        f"[bold]Tags:[/bold] {', '.join(wi.tags) if wi.tags else '—'}\n\n"
+        f"[bold]Descripción:[/bold]\n{wi.description[:500] or '—'}\n\n"
+        f"[bold]Criterios de aceptación:[/bold]\n{wi.acceptance_criteria[:500] or '—'}",
+        title=f"#{wi.id} — {wi.title}",
+        border_style="cyan",
+    ))
+
+
+@app.command("seed-knowledge")
+def seed_knowledge_cmd(
+    project: str = typer.Option("integratepie", "--project", "-p", help="Proyecto"),
+):
+    """Cargar knowledge base de un proyecto en memoria."""
+    mem = _get_memory_manager()
+
+    if project == "integratepie":
+        from jarvis.integrations.pie_knowledge import seed_knowledge
+        added = seed_knowledge(mem)
+        console.print(f"[green]IntegratePIE:[/green] {added} registros agregados a memoria.")
+    else:
+        console.print(f"[yellow]Sin knowledge base disponible para '{project}'.[/yellow]")
+
+    mem.close()
+
+
 # ---------------------------------------------------------------------------
 # Memory commands
 # ---------------------------------------------------------------------------
