@@ -1,0 +1,11 @@
+# Configuración de modelos LLM para JARVIS
+# Los perfiles built-in se usan por defecto.
+# Agrega modelos aquí para personalizar la selección.
+
+[budget]
+weekly_limit_usd = 5.00
+daily_alert_threshold_usd = 1.50
+auto_switch_to_local_at_pct = 80
+
+[preferences]
+prefer_local = true

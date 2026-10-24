@@ -835,5 +835,47 @@ def serve(
     uvicorn.run("jarvis.web.app:app", host=host, port=port, reload=False)
 
 
+@app.command()
+def models():
+    """Listar perfiles de modelos LLM disponibles."""
+    from jarvis.llm.model_selector import ModelSelector
+
+    selector = ModelSelector()
+    profiles = selector.list_profiles()
+
+    table = Table(title=f"Modelos LLM ({len(profiles)})")
+    table.add_column("ID", style="cyan")
+    table.add_column("Provider")
+    table.add_column("Nombre")
+    table.add_column("RAM", justify="right")
+    table.add_column("Costo/MTok", justify="right")
+    table.add_column("Recomendado para")
+
+    for p in profiles:
+        ram = f"{p.ram_gb}GB" if p.ram_gb else "cloud"
+        cost = f"${p.cost_per_mtok:.2f}" if p.cost_per_mtok else "gratis"
+        table.add_row(p.id, p.provider, p.name, ram, cost, ", ".join(p.recommended_for))
+
+    console.print(table)
+
+
+@app.command()
+def approvals():
+    """Ver políticas de autonomía y aprobación."""
+    from jarvis.security.autonomy import DEFAULT_POLICIES
+
+    table = Table(title="Políticas de Autonomía")
+    table.add_column("Operación", style="cyan")
+    table.add_column("Nivel mín.", justify="center")
+    table.add_column("Aprobación", justify="center")
+    table.add_column("Descripción")
+
+    for p in DEFAULT_POLICIES:
+        approval = "[red]Requerida[/red]" if p.requires_human_approval else "[green]Auto[/green]"
+        table.add_row(p.operation.value, str(p.min_autonomy_level), approval, p.description)
+
+    console.print(table)
+
+
 if __name__ == "__main__":
     app()
