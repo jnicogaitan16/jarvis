@@ -61,6 +61,15 @@ def _build_orchestrator():
     registry = AgentRegistry()
     registry.register(EchoAgent())
 
+    # Registrar QA Agent si IAAgent está disponible
+    try:
+        from jarvis.agents.qa.agent import QAAgent
+        from jarvis.integrations.iaagent_bridge import is_available
+        if is_available():
+            registry.register(QAAgent())
+    except Exception:
+        pass
+
     store = _get_event_store()
     mem = _get_memory_manager()
 
@@ -304,6 +313,95 @@ def events(
 
     console.print(table)
     store.close()
+
+
+# ---------------------------------------------------------------------------
+# QA commands
+# ---------------------------------------------------------------------------
+
+@app.command("analyze-pr")
+def analyze_pr(
+    pr_id: int = typer.Argument(help="ID del Pull Request"),
+    project: str = typer.Option("integratepie", "--project", "-p", help="Proyecto"),
+):
+    """Analizar un PR completo con el QA Agent."""
+    from jarvis.agents.base import AgentRequest
+    from jarvis.core.models import MemoryType
+    from jarvis.integrations.iaagent_bridge import is_available
+
+    if not is_available():
+        console.print("[red]IAAgent no disponible.[/red] Verifica IAAGENT_PATH.")
+        return
+
+    store = _get_event_store()
+    mem = _get_memory_manager()
+
+    console.print(f"[cyan]Analizando PR #{pr_id}...[/cyan]")
+
+    from jarvis.agents.qa.agent import QAAgent
+    agent = QAAgent()
+    request = AgentRequest(
+        intent="analyze_pr",
+        payload={"pr_id": pr_id},
+        project=project,
+    )
+
+    store.emit(
+        EventType.ACTION,
+        payload={"command": "analyze-pr", "pr_id": pr_id, "project": project},
+        agent_id="qa.analyzer",
+        project=project,
+    )
+
+    result = agent.execute(request)
+
+    if result.success:
+        console.print(
+            Panel(
+                result.content,
+                title=f"QA Analysis — PR #{pr_id}",
+                subtitle=f"{result.duration_ms}ms",
+                border_style="green",
+            )
+        )
+
+        # Guardar en memoria episódica
+        mem.add(
+            content=f"Análisis QA PR #{pr_id}: {result.content}",
+            project=project,
+            source=f"qa.analyzer:pr-{pr_id}",
+            memory_type=MemoryType.EPISODIC,
+            metadata=result.data,
+            tags=["qa", "pr-analysis", f"pr-{pr_id}"],
+        )
+
+        if result.evidence:
+            console.print(f"\n[dim]Evidencias guardadas:[/dim]")
+            for path in result.evidence:
+                console.print(f"  [dim]{path}[/dim]")
+
+        store.emit(
+            EventType.OBSERVATION,
+            payload={
+                "command": "analyze-pr",
+                "pr_id": pr_id,
+                "success": True,
+                **result.data,
+            },
+            agent_id="qa.analyzer",
+            project=project,
+        )
+    else:
+        console.print(f"[red]Error:[/red] {result.error}")
+        store.emit(
+            EventType.ERROR,
+            payload={"command": "analyze-pr", "pr_id": pr_id, "error": result.error},
+            agent_id="qa.analyzer",
+            project=project,
+        )
+
+    store.close()
+    mem.close()
 
 
 # ---------------------------------------------------------------------------
