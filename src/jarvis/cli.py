@@ -52,6 +52,15 @@ def _build_router():
     return router, tracker
 
 
+def _get_memory_manager():
+    """Construir Memory Manager."""
+    from jarvis.memory.manager import MemoryManager
+    from jarvis.memory.store import MemoryStore
+
+    store = MemoryStore(db_path=_get_db_path())
+    return MemoryManager(store=store, embeddings_enabled=True)
+
+
 @app.command()
 def ask(
     question: str = typer.Argument(help="Pregunta o instrucción para JARVIS"),
@@ -92,9 +101,18 @@ def ask(
         tracker.close()
         return
 
+    # Inyectar contexto de memoria en el prompt
+    mem = _get_memory_manager()
+    memory_context = mem.get_context_for_prompt(question, project=project)
+    mem.close()
+
+    system_prompt = "Eres JARVIS, un asistente de IA personal. Responde de forma concisa y útil en español."
+    if memory_context:
+        system_prompt += f"\n\n{memory_context}"
+
     request = LLMRequest(
         prompt=question,
-        system="Eres JARVIS, un asistente de IA personal. Responde de forma concisa y útil en español.",
+        system=system_prompt,
         project=project,
     )
 
@@ -155,7 +173,11 @@ def status():
         else:
             table.add_row(label, f"[dim]{ps.error or 'No disponible'}[/dim]")
 
-    table.add_row("Memoria", "[dim]Pendiente Fase 3[/dim]")
+    mem = _get_memory_manager()
+    mem_count = mem.count()
+    table.add_row("Memoria", f"[green]{mem_count} registros[/green]" if mem_count else "[dim]Vacía[/dim]")
+    mem.close()
+
     table.add_row("Agentes", "[dim]Pendiente Fase 4[/dim]")
 
     console.print(table)
@@ -243,6 +265,129 @@ def events(
 
     console.print(table)
     store.close()
+
+
+# ---------------------------------------------------------------------------
+# Memory commands
+# ---------------------------------------------------------------------------
+
+memory_app = typer.Typer(help="Gestionar memoria persistente de JARVIS.")
+app.add_typer(memory_app, name="memory")
+
+
+@memory_app.command("add")
+def memory_add(
+    content: str = typer.Argument(help="Contenido a recordar"),
+    project: str = typer.Option("personal", "--project", "-p", help="Proyecto asociado"),
+    source: str = typer.Option("user", "--source", "-s", help="Fuente del conocimiento"),
+    tag: Optional[list[str]] = typer.Option(None, "--tag", "-t", help="Tags"),
+):
+    """Agregar un registro a la memoria."""
+    from jarvis.core.models import MemoryType
+
+    mem = _get_memory_manager()
+    record = mem.add(
+        content=content,
+        project=project,
+        source=source,
+        memory_type=MemoryType.SEMANTIC,
+        tags=tag or [],
+    )
+    console.print(f"[green]Memorizado[/green] [{record.id}] en proyecto [cyan]{project}[/cyan]")
+    mem.close()
+
+
+@memory_app.command("search")
+def memory_search(
+    query: str = typer.Argument(help="Texto a buscar"),
+    project: Optional[str] = typer.Option(None, "--project", "-p", help="Filtrar por proyecto"),
+    limit: int = typer.Option(5, "--limit", "-n", help="Número de resultados"),
+):
+    """Buscar en la memoria."""
+    mem = _get_memory_manager()
+    results = mem.search(query, project=project, limit=limit)
+
+    if not results:
+        console.print("[dim]Sin resultados.[/dim]")
+        mem.close()
+        return
+
+    table = Table(title=f"Memoria — {len(results)} resultados para '{query}'")
+    table.add_column("ID", style="dim", width=12)
+    table.add_column("Proyecto", style="cyan", width=14)
+    table.add_column("Fuente", width=10)
+    table.add_column("Contenido", overflow="fold")
+    table.add_column("Score", justify="right", width=6)
+
+    for record, score in results:
+        table.add_row(
+            record.id,
+            record.project,
+            record.source,
+            record.content[:120],
+            f"{score:.2f}",
+        )
+
+    console.print(table)
+    mem.close()
+
+
+@memory_app.command("list")
+def memory_list(
+    project: str = typer.Option("personal", "--project", "-p", help="Proyecto"),
+    memory_type: Optional[str] = typer.Option(None, "--type", "-t", help="Tipo de memoria"),
+    limit: int = typer.Option(20, "--limit", "-n", help="Número de registros"),
+):
+    """Listar registros de memoria de un proyecto."""
+    mem = _get_memory_manager()
+    records = mem.search_by_project(project, memory_type=memory_type, limit=limit)
+
+    if not records:
+        console.print(f"[dim]Sin registros para proyecto '{project}'.[/dim]")
+        mem.close()
+        return
+
+    table = Table(title=f"Memoria — {project} ({len(records)} registros)")
+    table.add_column("ID", style="dim", width=12)
+    table.add_column("Tipo", width=14)
+    table.add_column("Fuente", width=10)
+    table.add_column("Contenido", overflow="fold")
+    table.add_column("Fecha", style="dim", width=10)
+
+    for rec in records:
+        table.add_row(
+            rec.id,
+            rec.memory_type.value,
+            rec.source,
+            rec.content[:100],
+            rec.updated_at.strftime("%Y-%m-%d"),
+        )
+
+    console.print(table)
+    mem.close()
+
+
+@memory_app.command("count")
+def memory_count():
+    """Ver conteo de registros de memoria por proyecto."""
+    mem = _get_memory_manager()
+    projects = list_projects()
+
+    table = Table(title="Memoria — Registros por proyecto")
+    table.add_column("Proyecto", style="cyan")
+    table.add_column("Registros", justify="right")
+
+    total = 0
+    for p in projects:
+        c = mem.count(project=p)
+        total += c
+        table.add_row(p, str(c))
+
+    table.add_section()
+    table.add_row("[bold]Total[/bold]", f"[bold]{total}[/bold]")
+
+    console.print(table)
+    mem.close()
 
 
 if __name__ == "__main__":
