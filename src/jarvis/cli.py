@@ -578,6 +578,166 @@ def memory_count():
 
 
 # ---------------------------------------------------------------------------
+# Observability commands
+# ---------------------------------------------------------------------------
+
+@app.command()
+def dashboard(
+    days: int = typer.Option(7, "--days", "-d", help="Período en días"),
+):
+    """Dashboard completo de métricas del sistema."""
+    from jarvis.observability.metrics import MetricsCollector
+
+    collector = MetricsCollector(db_path=_get_db_path())
+    m = collector.collect(days=days)
+
+    # System overview
+    table = Table(title=f"JARVIS Dashboard — últimos {days} días")
+    table.add_column("Métrica", style="cyan")
+    table.add_column("Valor", justify="right")
+
+    table.add_row("Eventos totales", f"{m.total_events:,}")
+    table.add_row("Registros de memoria", f"{m.memory_records:,}")
+    table.add_row("Requests LLM", f"{m.llm_requests:,}")
+    table.add_row("Tokens consumidos", f"{m.llm_tokens:,}")
+    table.add_row("Costo LLM", f"[green]${m.llm_cost_usd:.4f}[/green]")
+
+    console.print(table)
+
+    # Events by type
+    if m.events_by_type:
+        t2 = Table(title="Eventos por tipo")
+        t2.add_column("Tipo", style="cyan")
+        t2.add_column("Count", justify="right")
+        for k, v in m.events_by_type.items():
+            t2.add_row(k, str(v))
+        console.print(t2)
+
+    # Events by project
+    if m.events_by_project:
+        t3 = Table(title="Eventos por proyecto")
+        t3.add_column("Proyecto", style="cyan")
+        t3.add_column("Count", justify="right")
+        for k, v in m.events_by_project.items():
+            t3.add_row(k, str(v))
+        console.print(t3)
+
+    # Agent metrics
+    if m.agent_metrics:
+        t4 = Table(title="Métricas de agentes")
+        t4.add_column("Agente", style="cyan")
+        t4.add_column("Runs", justify="right")
+        t4.add_column("OK", justify="right", style="green")
+        t4.add_column("Fail", justify="right", style="red")
+        t4.add_column("Rate", justify="right")
+        t4.add_column("Avg ms", justify="right", style="dim")
+        for am in m.agent_metrics:
+            t4.add_row(
+                am.agent_id, str(am.total_runs), str(am.successes),
+                str(am.failures), f"{am.success_rate:.0f}%", str(am.avg_duration_ms),
+            )
+        console.print(t4)
+
+
+@app.command()
+def health():
+    """Verificar estado de todos los componentes."""
+    from jarvis.observability.health import check_all
+
+    checks = check_all(db_path=_get_db_path())
+
+    table = Table(title="Health Checks")
+    table.add_column("Componente", style="cyan")
+    table.add_column("Estado", width=6, justify="center")
+    table.add_column("Detalle")
+
+    for c in checks:
+        icon = "[green]OK[/green]" if c.healthy else "[red]FAIL[/red]"
+        table.add_row(c.component, icon, c.detail)
+
+    console.print(table)
+
+
+@app.command()
+def benchmark(
+    suite: str = typer.Option("intent", "--suite", "-s", help="Suite: intent, security, memory, all"),
+):
+    """Ejecutar benchmarks de calidad."""
+    from jarvis.observability.benchmarks import (
+        INTENT_DETECTION_CASES,
+        MEMORY_ISOLATION_CASES,
+        SECURITY_DETECTION_CASES,
+        BenchmarkRunner,
+    )
+
+    runner = BenchmarkRunner()
+    results = []
+
+    if suite in ("intent", "all"):
+        from jarvis.core.orchestrator import detect_intent
+        r = runner.run_suite(
+            "Intent Detection",
+            INTENT_DETECTION_CASES,
+            lambda data: {"intent": detect_intent(data["text"])},
+        )
+        results.append(r)
+
+    if suite in ("security", "all"):
+        try:
+            from jarvis.integrations.iaagent_bridge import get_pr_context_models, get_security_analyzer, is_available
+            if is_available():
+                def _run_security(data):
+                    mod = get_security_analyzer()
+                    models = get_pr_context_models()
+                    metadata = models.PRMetadata(pr_id=0, title="bench")
+                    diff = models.DiffEntry.from_raw("test.py", data["diff"])
+                    change = models.FileChange(path="test.py", change_type=models.ChangeType.EDIT)
+                    ctx = models.PRContext(metadata=metadata, diffs=[diff], changes=[change])
+                    findings = mod.SecurityAnalyzer().analyze(ctx)
+                    return {"has_findings": len(findings) > 0}
+
+                r = runner.run_suite("Security Detection", SECURITY_DETECTION_CASES, _run_security)
+                results.append(r)
+        except Exception as e:
+            console.print(f"[yellow]Security benchmark skipped: {e}[/yellow]")
+
+    if suite in ("memory", "all"):
+        from jarvis.memory.manager import MemoryManager
+        from jarvis.memory.store import MemoryStore
+
+        store = MemoryStore(db_path=_get_db_path())
+        mgr = MemoryManager(store=store, embeddings_enabled=False)
+
+        def _run_memory(data):
+            if data.get("data_project"):
+                mgr.add(f"Test data for {data['query']}", project=data["data_project"], source="benchmark")
+            results = mgr.search(data["query"], project=data["search_project"])
+            return {"results_count": len(results), "results_found": len(results) > 0}
+
+        r = runner.run_suite("Memory Isolation", MEMORY_ISOLATION_CASES, _run_memory)
+        results.append(r)
+        mgr.close()
+
+    if not results:
+        console.print("[yellow]Sin benchmarks ejecutados.[/yellow]")
+        return
+
+    for r in results:
+        color = "green" if r.pass_rate >= 80 else "yellow" if r.pass_rate >= 50 else "red"
+        table = Table(title=f"{r.name} — [{color}]{r.pass_rate:.0f}%[/{color}] ({r.passed}/{r.total})")
+        table.add_column("ID", style="dim", width=8)
+        table.add_column("Nombre")
+        table.add_column("Estado", width=6, justify="center")
+        table.add_column("ms", justify="right", width=5)
+
+        for br in r.results:
+            icon = "[green]PASS[/green]" if br.passed else "[red]FAIL[/red]"
+            table.add_row(br.case_id, br.case_id, icon, str(br.duration_ms))
+
+        console.print(table)
+
+
+# ---------------------------------------------------------------------------
 # Agent commands
 # ---------------------------------------------------------------------------
 
