@@ -71,6 +71,22 @@ def _build_orchestrator():
     ), registry
 
 
+def _build_tool_registry():
+    """Construir Tool Registry con herramientas disponibles."""
+    from jarvis.tools.registry import ToolRegistry
+
+    registry = ToolRegistry()
+
+    # Registrar QA tools de IAAgent si está disponible
+    try:
+        from jarvis.tools.qa.analyzers import register_qa_tools
+        register_qa_tools(registry)
+    except Exception:
+        pass  # IAAgent no disponible, sin tools QA
+
+    return registry
+
+
 def _get_memory_manager():
     """Construir Memory Manager."""
     from jarvis.memory.manager import MemoryManager
@@ -197,7 +213,11 @@ def status():
     table.add_row("Memoria", f"[green]{mem_count} registros[/green]" if mem_count else "[dim]Vacía[/dim]")
     mem.close()
 
-    table.add_row("Agentes", "[dim]Pendiente Fase 4[/dim]")
+    _, agent_reg = _build_orchestrator()
+    table.add_row("Agentes", f"[green]{agent_reg.count}[/green]")
+
+    tool_reg = _build_tool_registry()
+    table.add_row("Tools QA (IAAgent)", f"[green]{tool_reg.count}[/green]" if tool_reg.count else "[dim]No disponible[/dim]")
 
     console.print(table)
     store.close()
@@ -436,6 +456,30 @@ def agents():
             ", ".join(s.skills) if s.skills else "—",
             ", ".join(s.supported_projects) if s.supported_projects else "todos",
         )
+
+    console.print(table)
+
+
+@app.command()
+def tools(
+    project: str = typer.Option("personal", "--project", "-p", help="Filtrar por proyecto"),
+):
+    """Listar herramientas disponibles."""
+    reg = _build_tool_registry()
+    specs = reg.list_for_project(project)
+
+    if not specs:
+        console.print("[dim]Sin herramientas disponibles.[/dim]")
+        return
+
+    table = Table(title=f"Herramientas JARVIS ({len(specs)})")
+    table.add_column("ID", style="cyan")
+    table.add_column("Nombre")
+    table.add_column("Descripción", overflow="fold")
+    table.add_column("Side effects", justify="center", width=12)
+
+    for s in specs:
+        table.add_row(s.id, s.name, s.description, "Sí" if s.has_side_effects else "No")
 
     console.print(table)
 
