@@ -52,6 +52,25 @@ def _build_router():
     return router, tracker
 
 
+def _build_orchestrator():
+    """Construir Orchestrator con agentes registrados."""
+    from jarvis.agents.echo import EchoAgent
+    from jarvis.agents.registry import AgentRegistry
+    from jarvis.core.orchestrator import Orchestrator
+
+    registry = AgentRegistry()
+    registry.register(EchoAgent())
+
+    store = _get_event_store()
+    mem = _get_memory_manager()
+
+    return Orchestrator(
+        agent_registry=registry,
+        event_store=store,
+        memory_manager=mem,
+    ), registry
+
+
 def _get_memory_manager():
     """Construir Memory Manager."""
     from jarvis.memory.manager import MemoryManager
@@ -388,6 +407,67 @@ def memory_count():
 
     console.print(table)
     mem.close()
+
+
+# ---------------------------------------------------------------------------
+# Agent commands
+# ---------------------------------------------------------------------------
+
+@app.command()
+def agents():
+    """Listar agentes registrados."""
+    _, registry = _build_orchestrator()
+
+    specs = registry.list_all()
+    if not specs:
+        console.print("[dim]Sin agentes registrados.[/dim]")
+        return
+
+    table = Table(title=f"Agentes JARVIS ({len(specs)})")
+    table.add_column("ID", style="cyan")
+    table.add_column("Nombre")
+    table.add_column("Skills", style="dim")
+    table.add_column("Proyectos", style="dim")
+
+    for s in specs:
+        table.add_row(
+            s.id,
+            s.name,
+            ", ".join(s.skills) if s.skills else "—",
+            ", ".join(s.supported_projects) if s.supported_projects else "todos",
+        )
+
+    console.print(table)
+
+
+@app.command()
+def run(
+    task: str = typer.Argument(help="Descripción de la tarea"),
+    project: str = typer.Option("personal", "--project", "-p", help="Proyecto"),
+):
+    """Ejecutar una tarea a través del orchestrator."""
+    from jarvis.agents.base import AgentRequest
+
+    orchestrator, _ = _build_orchestrator()
+    request = AgentRequest(
+        intent=task,
+        payload={"question": task},
+        project=project,
+    )
+
+    result = orchestrator.route(request)
+
+    if result.success:
+        console.print(
+            Panel(
+                result.content,
+                title=f"Agente: {result.agent_id}",
+                subtitle=f"{result.duration_ms}ms",
+                border_style="green",
+            )
+        )
+    else:
+        console.print(f"[red]Error:[/red] {result.error}")
 
 
 if __name__ == "__main__":
