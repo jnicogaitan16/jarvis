@@ -1,0 +1,16 @@
+[project]
+name = "IntegratePIE"
+
+[ai_policy]
+allow_cloud = true
+allowed_providers = ["ollama", "gemini"]
+autonomy_level = 0
+
+[privacy]
+allow_pii_to_cloud = false
+sensitive_patterns = ["run", "rut", "nombre_alumno", "diagnostico"]
+
+[permissions]
+read_repo = true
+read_azure_devops = true
+write_azure_devops = false

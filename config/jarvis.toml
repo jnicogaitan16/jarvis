@@ -1,0 +1,9 @@
+[jarvis]
+version = "0.1.0"
+default_project = "personal"
+
+[database]
+path = "data/jarvis.db"
+
+[logging]
+level = "INFO"
