@@ -49,6 +49,11 @@ def _build_router():
     if gemini.is_available():
         router.register(gemini)
 
+    from jarvis.llm.claude_code import ClaudeCodeProvider
+    claude = ClaudeCodeProvider()
+    if claude.is_available():
+        router.register(claude)
+
     return router, tracker
 
 

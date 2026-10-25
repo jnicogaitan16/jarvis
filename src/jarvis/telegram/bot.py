@@ -84,7 +84,8 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/proyecto <id> — Cambiar proyecto\n"
         "/costos — Consumo LLM\n"
         "/agentes — Listar agentes\n"
-        "/logs — Últimos eventos\n\n"
+        "/logs — Últimos eventos\n"
+        "/docker status|up|down|logs — Docker KameCol\n\n"
         "O simplemente escribe tu pregunta."
     )
 
@@ -273,6 +274,92 @@ async def cmd_logs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("\n".join(lines))
 
 
+async def cmd_docker(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Gestionar Docker de KameCol desde Telegram."""
+    if not _is_authorized(update):
+        return await _unauthorized(update)
+
+    import subprocess
+
+    action = context.args[0] if context.args else "status"
+    kamecol_path = os.path.expanduser("~/Developer/Personal/kame.colStore")
+
+    if action == "status":
+        try:
+            result = subprocess.run(
+                ["docker", "ps", "--format", "{{.Names}}\t{{.Status}}\t{{.Ports}}"],
+                capture_output=True, text=True, timeout=10,
+            )
+            if result.stdout.strip():
+                lines = ["🐳 Contenedores activos:"]
+                for line in result.stdout.strip().split("\n"):
+                    parts = line.split("\t")
+                    name = parts[0] if parts else "?"
+                    status = parts[1] if len(parts) > 1 else "?"
+                    lines.append(f"• {name}: {status}")
+                await update.message.reply_text("\n".join(lines))
+            else:
+                await update.message.reply_text("🐳 Sin contenedores activos.")
+        except Exception as e:
+            await update.message.reply_text(f"Error: {e}")
+
+    elif action == "up":
+        await update.message.reply_text("🐳 Levantando KameCol...")
+        try:
+            result = subprocess.run(
+                ["docker", "compose", "up", "-d"],
+                cwd=kamecol_path, capture_output=True, text=True, timeout=60,
+            )
+            output = result.stdout + result.stderr
+            await update.message.reply_text(f"🐳 KameCol:\n{output[-500:]}")
+        except Exception as e:
+            await update.message.reply_text(f"Error: {e}")
+
+    elif action == "down":
+        await update.message.reply_text("🐳 Deteniendo KameCol...")
+        try:
+            result = subprocess.run(
+                ["docker", "compose", "down"],
+                cwd=kamecol_path, capture_output=True, text=True, timeout=30,
+            )
+            await update.message.reply_text(f"🐳 KameCol detenido.\n{result.stdout[-300:]}")
+        except Exception as e:
+            await update.message.reply_text(f"Error: {e}")
+
+    elif action == "logs":
+        try:
+            result = subprocess.run(
+                ["docker", "compose", "logs", "--tail=15"],
+                cwd=kamecol_path, capture_output=True, text=True, timeout=10,
+            )
+            logs = result.stdout[-1500:] if result.stdout else "Sin logs."
+            await update.message.reply_text(f"🐳 Logs:\n{logs}")
+        except Exception as e:
+            await update.message.reply_text(f"Error: {e}")
+
+    elif action == "restart":
+        await update.message.reply_text("🐳 Reiniciando KameCol...")
+        try:
+            subprocess.run(["docker", "compose", "down"], cwd=kamecol_path, capture_output=True, timeout=30)
+            result = subprocess.run(
+                ["docker", "compose", "up", "-d"],
+                cwd=kamecol_path, capture_output=True, text=True, timeout=60,
+            )
+            await update.message.reply_text(f"🐳 KameCol reiniciado.\n{result.stdout[-300:]}")
+        except Exception as e:
+            await update.message.reply_text(f"Error: {e}")
+
+    else:
+        await update.message.reply_text(
+            "🐳 Comandos Docker:\n"
+            "/docker status — Ver contenedores\n"
+            "/docker up — Levantar KameCol\n"
+            "/docker down — Detener KameCol\n"
+            "/docker restart — Reiniciar\n"
+            "/docker logs — Ver logs"
+        )
+
+
 # Historial conversacional por usuario (últimos N mensajes)
 _user_history: dict[int, list[dict]] = {}
 _MAX_HISTORY = 8  # Últimos 4 intercambios
@@ -339,8 +426,152 @@ def _get_repo_context(text: str, project: str) -> str:
         return ""
 
 
+def _get_api_context(text: str, project: str) -> str:
+    """Detectar si la pregunta necesita datos de APIs reales y obtenerlos."""
+    if project != "kamecol":
+        return ""
+
+    text_lower = text.lower()
+    try:
+        return _fetch_kamecol_data(text_lower)
+    except Exception as e:
+        log.warning("API context error: %s", e)
+        return ""
+
+
+def _fetch_kamecol_data(text_lower: str) -> str:
+    api_keywords = ("producto", "product", "catálogo", "catalogo", "tienda", "precio",
+                    "talla", "stock", "departamento", "categoría", "categoria",
+                    "pedido", "orden", "order", "venta", "inventario",
+                    "cuántos", "cuantos", "lista", "muestra", "dime")
+
+    if not any(kw in text_lower for kw in api_keywords):
+        return ""
+
+    from jarvis.integrations.kamecol import KameColPublicClient
+
+    client = KameColPublicClient()
+    if not client.is_configured:
+        return ""
+
+    context_parts = []
+
+    # Productos / catálogo
+    if any(kw in text_lower for kw in ("producto", "product", "catálogo", "catalogo",
+                                        "tienda", "cuántos", "cuantos", "precio", "stock")):
+        products = client.get_products(limit=50)
+        if products:
+            lines = [f"Catálogo KameCol ({len(products)} productos):"]
+            for p in products[:15]:
+                price = f"${p.price:,.0f}"
+                if p.discount_price:
+                    price = f"${p.discount_price:,.0f} (antes ${p.price:,.0f})"
+                stock_txt = "✅" if p.in_stock else "❌"
+                lines.append(f"  {stock_txt} {p.name} — {price} COP [{p.category}]")
+            if len(products) > 15:
+                lines.append(f"  ... y {len(products) - 15} más")
+            context_parts.append("\n".join(lines))
+
+    # Departamentos / categorías
+    if any(kw in text_lower for kw in ("departamento", "categoría", "categoria", "navegación")):
+        nav = client.get_navigation()
+        if nav:
+            lines = ["Departamentos y categorías:"]
+            for dept in nav:
+                name = dept.get("name", "?")
+                cats = dept.get("categories", [])
+                cat_names = ", ".join(c.get("name", "") for c in cats) if cats else "—"
+                lines.append(f"  {name}: {cat_names}")
+            context_parts.append("\n".join(lines))
+
+    # Estado de pedido
+    if any(kw in text_lower for kw in ("pedido", "orden", "order", "tracking")):
+        import re
+        ref_match = re.search(r"[A-Z0-9]{6,}", text_lower.upper())
+        if ref_match:
+            status = client.get_order_status(ref_match.group())
+            if status:
+                context_parts.append(
+                    f"Pedido {status.reference}: estado={status.status}, "
+                    f"total=${status.total:,.0f} COP"
+                )
+
+    return "\n\n".join(context_parts) if context_parts else ""
+
+
+def _get_db_context(text: str, project: str) -> str:
+    """Consultar la DB de PRODUCCIÓN. Se activa siempre para proyecto kamecol."""
+    if project != "kamecol":
+        return ""
+
+    try:
+        from jarvis.integrations.kamecol_db import KameColDB
+        db = KameColDB()
+        if not db.is_configured:
+            return ""
+
+        parts = []
+
+        # Siempre incluir resumen base de producción
+        summary = db.get_orders_summary(30)
+        parts.append(
+            f"[DATOS PRODUCCIÓN] KameCol (30 días): {summary['total_orders']} órdenes, "
+            f"${summary['total_revenue']:,.0f} COP. "
+            f"Clientes: {db.get_customers_count()}. Productos: {db.get_product_count()}. "
+            "Estado: " + ", ".join(f"{k}={v['count']}" for k, v in summary["by_status"].items())
+        )
+
+        # Últimas órdenes siempre visibles
+        orders = db.get_recent_orders(5)
+        if orders:
+            lines = []
+            for o in orders:
+                lines.append(
+                    f"{o['payment_reference']} — {o['status']} — "
+                    f"${float(o['total']):,.0f} COP — {o['payment_method'] or '?'} — "
+                    f"{str(o['created_at'])[:10]}"
+                )
+            parts.append("Últimas órdenes:\n" + "\n".join(lines))
+
+        # Top productos
+        top = db.get_top_products(90, 5)
+        if top:
+            lines = [f"{p['name']}: {p['units_sold']}u — ${float(p['revenue']):,.0f}" for p in top]
+            parts.append("Top productos (90d): " + "; ".join(lines))
+
+        # Stock bajo
+        text_lower = text.lower()
+        if any(kw in text_lower for kw in ("stock", "inventario", "agotado", "talla")):
+            low = db.get_inventory_low(3)
+            if low:
+                lines = [f"{i['category']} {i['variant']} {i['color']}: {i['quantity']}u" for i in low[:8]]
+                parts.append("Stock bajo: " + "; ".join(lines))
+
+        # Funnel
+        if any(kw in text_lower for kw in ("funnel", "conversión", "visita", "analítica")):
+            funnel = db.get_funnel_stats(30)
+            if funnel:
+                lines = [f"{f['event']}={f['count']}" for f in funnel]
+                parts.append("Funnel (30d): " + ", ".join(lines))
+
+        return "\n".join(parts) if parts else ""
+
+    except Exception as e:
+        log.warning("DB context error: %s", e)
+        return ""
+
+
+# Mapeo de proyecto a directorio de trabajo para Claude Code
+_PROJECT_DIRS: dict[str, str] = {
+    "kamecol": os.path.expanduser("~/Developer/Personal/kame.colStore"),
+    "iaagent": os.path.expanduser("~/Developer/Personal/IaAgent"),
+    "jarvis": os.path.expanduser("~/Developer/Personal/jarvis"),
+    "personal": os.path.expanduser("~/Developer/Personal/jarvis"),
+}
+
+
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Manejar mensajes de texto — pregunta a JARVIS con IA + repos + memoria."""
+    """Ejecutar Claude Code CLI con el mensaje — misma potencia que la terminal."""
     if not _is_authorized(update):
         return await _unauthorized(update)
 
@@ -350,94 +581,71 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user_id = update.effective_user.id
     project = _get_project(user_id)
+    cwd = _PROJECT_DIRS.get(project, _PROJECT_DIRS["personal"])
 
     await update.message.reply_chat_action("typing")
 
     try:
-        from jarvis.config import load_global_config, load_project_context
-        from jarvis.core.events import EventStore
-        from jarvis.core.models import EventType
-        from jarvis.llm.base import LLMRequest
-        from jarvis.llm.gemini import GeminiProvider
-        from jarvis.llm.ollama import OllamaProvider
-        from jarvis.llm.router import LLMRouter
-        from jarvis.llm.usage import UsageTracker
-        from jarvis.memory.manager import MemoryManager
-        from jarvis.memory.store import MemoryStore
+        import shutil
+        import subprocess
+        import time
 
-        db = load_global_config().get("database", {}).get("path", "data/jarvis.db")
-        ctx = load_project_context(project)
+        cli = shutil.which("claude")
+        if not cli:
+            await update.message.reply_text("Claude Code CLI no encontrado en el sistema.")
+            return
 
-        # 1. Contexto de memoria
-        mem_store = MemoryStore(db_path=db)
-        mgr = MemoryManager(store=mem_store, embeddings_enabled=False)
-        memory_context = mgr.get_context_for_prompt(text, project=project)
-        mgr.close()
-
-        # 2. Contexto del repo (si la pregunta lo necesita)
-        repo_context = _get_repo_context(text, project)
-
-        # 3. Historial conversacional
-        history = _user_history.get(user_id, [])
-        conversation = ""
-        for msg in history[-_MAX_HISTORY:]:
-            conversation += f"Nico: {msg['user']}\nJARVIS: {msg['assistant']}\n\n"
-
-        # 4. System prompt enriquecido
-        system_prompt = (
-            "Eres JARVIS, el asistente personal de Nico Gaitán. "
-            "Responde de forma directa, concisa y en español. "
-            "Si tienes datos concretos (commits, código, memoria), úsalos. "
-            "Si NO tienes la información, di que no la tienes — NUNCA inventes datos. "
-            f"Proyecto actual: {ctx.display_name}."
+        # Construir prompt con contexto de proyecto
+        prompt = (
+            f"Responde BREVE en español (máximo 4 oraciones). "
+            f"Proyecto actual: {project}. Directorio: {cwd}. "
+            f"La DB de KameCol es PostgreSQL (KAMECOL_DATABASE_URL en env). "
+            f"NO uses MySQL. Usa psql o python con psycopg2 si necesitas consultar la DB. "
+            f"Pregunta: {text}"
         )
-        if memory_context:
-            system_prompt += f"\n\n{memory_context}"
-        if repo_context:
-            system_prompt += f"\n\nDatos reales del repositorio:\n{repo_context}"
 
-        prompt = conversation + f"Nico: {text}\nJARVIS:" if conversation else text
-
-        # 5. LLM
-        tracker = UsageTracker(db_path=db)
-        router = LLMRouter(usage_tracker=tracker)
-        router.register(OllamaProvider())
-        gemini = GeminiProvider()
-        if gemini.is_available():
-            router.register(gemini)
-
-        request = LLMRequest(prompt=prompt, system=system_prompt, project=project)
-        response = router.generate(request, ctx)
-
-        # 6. Guardar en historial
-        if user_id not in _user_history:
-            _user_history[user_id] = []
-        _user_history[user_id].append({"user": text, "assistant": response.content})
-        if len(_user_history[user_id]) > _MAX_HISTORY:
-            _user_history[user_id] = _user_history[user_id][-_MAX_HISTORY:]
-
-        # 7. Event log
-        store = EventStore(db_path=db)
-        store.emit(EventType.ACTION, {"command": "telegram", "message": text}, project=project)
-        store.emit(
-            EventType.OBSERVATION,
-            {"response": response.content[:200], "provider": response.provider, "tokens": response.total_tokens},
-            project=project,
+        start = time.monotonic()
+        result = subprocess.run(
+            [cli, "-p", prompt, "--max-turns", "10",
+             "--dangerously-skip-permissions"],
+            capture_output=True,
+            text=True,
+            cwd=cwd,
+            timeout=120,
+            env={**os.environ, "TERM": "dumb"},
         )
-        store.close()
-        tracker.close()
+        elapsed = int((time.monotonic() - start) * 1000)
 
-        # 8. Responder
-        reply = response.content
-        footer = f"\n\n_{response.provider}:{response.model} · {response.total_tokens} tok · {response.latency_ms}ms_"
-        # Telegram Markdown puede fallar con caracteres especiales
+        if result.returncode != 0 and not result.stdout:
+            error = result.stderr[:300] if result.stderr else "Error desconocido"
+            await update.message.reply_text(f"Error Claude: {error}")
+            return
+
+        reply = result.stdout.strip()
+        if not reply:
+            reply = "Sin respuesta de Claude Code."
+
+        # Truncar si es muy largo para Telegram (límite 4096 chars)
+        if len(reply) > 3800:
+            reply = reply[:3800] + "\n\n... (respuesta truncada)"
+
+        footer = f"\n\n_claude-code · {elapsed}ms_"
         try:
             await update.message.reply_text(reply + footer, parse_mode="Markdown")
         except Exception:
             await update.message.reply_text(reply + footer)
 
+        # Guardar en historial
+        if user_id not in _user_history:
+            _user_history[user_id] = []
+        _user_history[user_id].append({"user": text, "assistant": reply[:200]})
+        if len(_user_history[user_id]) > _MAX_HISTORY:
+            _user_history[user_id] = _user_history[user_id][-_MAX_HISTORY:]
+
+    except subprocess.TimeoutExpired:
+        await update.message.reply_text("Timeout — Claude tardó más de 2 minutos.")
     except Exception as e:
-        log.error("Telegram message error: %s", e)
+        log.error("Claude Code error: %s", e)
         await update.message.reply_text(f"Error: {e}")
 
 
@@ -457,6 +665,7 @@ def create_bot() -> Application:
     app.add_handler(CommandHandler("costos", cmd_costos))
     app.add_handler(CommandHandler("agentes", cmd_agentes))
     app.add_handler(CommandHandler("logs", cmd_logs))
+    app.add_handler(CommandHandler("docker", cmd_docker))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
     return app

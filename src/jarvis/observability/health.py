@@ -19,6 +19,7 @@ def check_all(db_path: str = "data/jarvis.db") -> list[HealthCheck]:
     checks = [
         _check_sqlite(db_path),
         _check_ollama(),
+        _check_claude_code(),
         _check_gemini(),
         _check_iaagent(),
         _check_kamecol(),
@@ -49,6 +50,20 @@ def _check_ollama() -> HealthCheck:
         return HealthCheck("Ollama", False, f"Status {resp.status_code}")
     except Exception:
         return HealthCheck("Ollama", False, "No accesible (localhost:11434)")
+
+
+def _check_claude_code() -> HealthCheck:
+    import shutil
+    cli = shutil.which("claude")
+    if cli:
+        try:
+            import subprocess
+            result = subprocess.run([cli, "--version"], capture_output=True, text=True, timeout=5)
+            version = result.stdout.strip().split("\n")[0] if result.stdout else "?"
+            return HealthCheck("Claude Code", True, f"CLI v{version}")
+        except Exception:
+            return HealthCheck("Claude Code", True, cli)
+    return HealthCheck("Claude Code", False, "CLI no encontrado")
 
 
 def _check_gemini() -> HealthCheck:

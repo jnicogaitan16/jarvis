@@ -62,17 +62,23 @@ class LLMRouter:
         allowed = context.allowed_providers
         complexity = classify_complexity(request.prompt)
 
-        # 1. Para tareas simples o de código, preferir local
-        if complexity in (TaskComplexity.SIMPLE, TaskComplexity.CODE):
+        # 1. Para tareas simples, preferir local (rápido)
+        if complexity == TaskComplexity.SIMPLE:
             if "ollama" in allowed:
                 ollama = self._providers.get("ollama")
                 if ollama and ollama.is_available():
                     return ollama
 
-        # 2. Para tareas medio/complejas, intentar cloud si permitido
+        # 2. Para tareas medio/complejas/código, preferir Claude Code si disponible
+        if complexity in (TaskComplexity.MEDIUM, TaskComplexity.COMPLEX, TaskComplexity.CODE):
+            claude = self._providers.get("claude_code")
+            if claude and claude.is_available():
+                return claude
+
+        # 3. Fallback cloud: Gemini si permitido
         if complexity in (TaskComplexity.MEDIUM, TaskComplexity.COMPLEX):
             if context.allow_cloud:
-                for pid in ("gemini",):  # Extensible a otros providers
+                for pid in ("gemini",):
                     if pid in allowed:
                         provider = self._providers.get(pid)
                         if provider and provider.is_available():

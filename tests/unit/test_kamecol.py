@@ -33,7 +33,8 @@ class TestModels:
 
 
 class TestPublicClient:
-    def test_not_configured(self):
+    def test_not_configured(self, monkeypatch):
+        monkeypatch.delenv("KAMECOL_API_URL", raising=False)
         client = KameColPublicClient(base_url="")
         assert client.is_configured is False
         assert client.get_products() == []
@@ -146,7 +147,8 @@ class TestKameColAgent:
         assert result.success is True
         assert "available_actions" in result.data
 
-    def test_search_not_configured(self):
+    def test_search_not_configured(self, monkeypatch):
+        monkeypatch.delenv("KAMECOL_API_URL", raising=False)
         from jarvis.agents.base import AgentRequest
         from jarvis.agents.business.kamecol_agent import KameColAgent
 
