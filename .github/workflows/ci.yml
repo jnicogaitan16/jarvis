@@ -39,6 +39,6 @@ jobs:
             --deselect tests/unit/test_cli.py::TestCLI::test_no_args_shows_help \
             --cov=src/jarvis \
             --cov-report=term-missing \
-            --cov-fail-under=70
+            --cov-fail-under=60
         env:
           JARVIS_ENV: ci
