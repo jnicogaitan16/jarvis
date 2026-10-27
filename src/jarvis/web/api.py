@@ -7,7 +7,6 @@ from fastapi import APIRouter, Query
 from jarvis import __version__
 from jarvis.config import list_projects, load_global_config
 from jarvis.core.events import EventStore
-from jarvis.core.models import MemoryType
 from jarvis.memory.manager import MemoryManager
 from jarvis.memory.store import MemoryStore
 from jarvis.observability.health import check_all

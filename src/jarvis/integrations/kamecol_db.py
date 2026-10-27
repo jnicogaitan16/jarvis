@@ -40,7 +40,7 @@ class KameColDB:
             raise RuntimeError("KAMECOL_DATABASE_URL no configurada")
 
         if _BLOCKED_PATTERNS.search(sql):
-            raise PermissionError(f"Operación de escritura bloqueada. Solo SELECT permitido.")
+            raise PermissionError("Operación de escritura bloqueada. Solo SELECT permitido.")
 
         if not sql.strip().upper().startswith("SELECT"):
             raise PermissionError("Solo queries SELECT permitidas.")

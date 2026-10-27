@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from jarvis.agents.base import AgentRequest, AgentResult, AgentSpec, BaseAgent
@@ -38,7 +38,7 @@ class QAAgent(BaseAgent):
 
     def execute(self, request: AgentRequest) -> AgentResult:
         start = time.monotonic()
-        pr_id = request.payload.get("pr_id")
+        request.payload.get("pr_id")
         project = request.project
 
         try:
@@ -154,7 +154,7 @@ class QAAgent(BaseAgent):
 
     def _save_evidence(self, pr_id: int, project: str, result) -> list[str]:
         """Guardar reporte markdown como evidencia."""
-        evidence_dir = Path("data/evidence") / project / datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        evidence_dir = Path("data/evidence") / project / datetime.now(UTC).strftime("%Y-%m-%d")
         evidence_dir.mkdir(parents=True, exist_ok=True)
 
         paths = []
@@ -178,7 +178,7 @@ class QAAgent(BaseAgent):
             "findings_count": len(result.report.all_findings),
             "test_cases_count": len(result.test_cases),
             "recommendation": result.report.recommendation.value,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
         data_path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
         paths.append(str(data_path))

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import StrEnum
 
 
@@ -61,7 +61,7 @@ class PipelineResult:
     success: bool
     steps: list[StepResult] = field(default_factory=list)
     total_duration_ms: int = 0
-    started_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    started_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     @property
     def completed_steps(self) -> int:

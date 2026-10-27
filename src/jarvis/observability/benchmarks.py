@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Callable
 
 
 @dataclass
@@ -101,10 +101,7 @@ class BenchmarkRunner:
         return evaluator(case.expected, actual)
 
     def _eval_exact(self, expected: dict, actual: dict) -> bool:
-        for key, val in expected.items():
-            if actual.get(key) != val:
-                return False
-        return True
+        return all(actual.get(key) == val for key, val in expected.items())
 
     def _eval_contains(self, expected: dict, actual: dict) -> bool:
         for key, val in expected.items():
@@ -114,10 +111,7 @@ class BenchmarkRunner:
         return True
 
     def _eval_gte(self, expected: dict, actual: dict) -> bool:
-        for key, val in expected.items():
-            if actual.get(key, 0) < val:
-                return False
-        return True
+        return all(actual.get(key, 0) >= val for key, val in expected.items())
 
 
 # ---------------------------------------------------------------------------

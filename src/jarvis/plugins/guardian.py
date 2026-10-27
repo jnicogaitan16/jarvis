@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from jarvis.plugins.discovery import discover_all, discover_mcp_from_permissions
 from jarvis.plugins.models import PluginHealth, PluginStatus
@@ -24,7 +24,7 @@ class GuardianReport:
     new_plugins: list[str] = field(default_factory=list)
     lost_plugins: list[str] = field(default_factory=list)
     permission_servers: list[str] = field(default_factory=list)
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
 class PluginGuardian:
@@ -64,7 +64,7 @@ class PluginGuardian:
                 PluginHealth(plugin_id=pid, status=PluginStatus.NOT_INSTALLED, detail="No detectado en último scan")
             )
 
-        self._last_scan = datetime.now(timezone.utc)
+        self._last_scan = datetime.now(UTC)
 
         report = GuardianReport(
             total_discovered=len(discovered),

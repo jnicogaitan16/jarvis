@@ -1,6 +1,5 @@
 """Tests para Tool Registry y BaseTool."""
 
-import pytest
 
 from jarvis.core.models import ProjectContext, ToolAction
 from jarvis.tools.base import BaseTool, ToolSpec

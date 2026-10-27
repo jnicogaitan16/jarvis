@@ -7,7 +7,7 @@ import shutil
 import subprocess
 import time
 
-from jarvis.llm.base import LLMProvider, LLMRequest, LLMResponse, ProviderStatus
+from jarvis.llm.base import LLMRequest, LLMResponse, ProviderStatus
 
 
 class ClaudeCodeProvider:

@@ -1,8 +1,7 @@
 """Tests para IntegratePIE connector — work items, publisher, knowledge base."""
 
-import pytest
 
-from jarvis.integrations.azure_devops import AzureDevOpsExtended, WorkItem, _strip_html
+from jarvis.integrations.azure_devops import AzureDevOpsExtended, _strip_html
 
 
 class TestStripHTML:

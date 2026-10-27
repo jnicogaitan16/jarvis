@@ -6,7 +6,6 @@ from jarvis.core.models import ProjectContext
 from jarvis.llm.base import LLMRequest, LLMResponse, ProviderStatus
 from jarvis.llm.router import LLMRouter, classify_complexity
 
-
 # ---------------------------------------------------------------------------
 # Mock providers
 # ---------------------------------------------------------------------------

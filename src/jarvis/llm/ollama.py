@@ -6,7 +6,7 @@ import time
 
 import httpx
 
-from jarvis.llm.base import LLMProvider, LLMRequest, LLMResponse, ProviderStatus
+from jarvis.llm.base import LLMRequest, LLMResponse, ProviderStatus
 
 
 class OllamaProvider:

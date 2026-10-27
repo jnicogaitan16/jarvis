@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 import time
+from datetime import UTC
 
 from jarvis.agents.base import AgentRequest, AgentResult, AgentSpec, BaseAgent
 from jarvis.agents.qa.templates import (
@@ -116,8 +117,8 @@ class WriterAgent(BaseAgent):
             fields["suite_name"] = _extract_after(text, ("suite", "prueba", "test", "resultado"))
             fields["observations"] = text
 
-        from datetime import datetime, timezone
-        fields["date"] = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        from datetime import datetime
+        fields["date"] = datetime.now(UTC).strftime("%Y-%m-%d")
         fields["execution_date"] = fields["date"]
 
         return fields

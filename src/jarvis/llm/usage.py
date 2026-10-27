@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-import json
 import sqlite3
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from jarvis.llm.base import LLMResponse
@@ -58,7 +57,7 @@ class UsageTracker:
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)",
             (
                 uuid.uuid4().hex[:12],
-                datetime.now(timezone.utc).isoformat(),
+                datetime.now(UTC).isoformat(),
                 response.provider,
                 response.model,
                 project,
@@ -87,7 +86,7 @@ class UsageTracker:
             "VALUES (?, ?, ?, ?, ?, 0, ?)",
             (
                 uuid.uuid4().hex[:12],
-                datetime.now(timezone.utc).isoformat(),
+                datetime.now(UTC).isoformat(),
                 provider,
                 model,
                 project,

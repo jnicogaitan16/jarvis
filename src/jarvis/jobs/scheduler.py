@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from jarvis.jobs.engine import huey
 
@@ -23,7 +23,7 @@ def daily_maintenance():
         count = store.count()
         store.close()
         log.info("Maintenance: %d events in store", count)
-        return {"status": "ok", "events": count, "timestamp": datetime.now(timezone.utc).isoformat()}
+        return {"status": "ok", "events": count, "timestamp": datetime.now(UTC).isoformat()}
     except Exception as e:
         log.error("Maintenance failed: %s", e)
         return {"status": "error", "error": str(e)}

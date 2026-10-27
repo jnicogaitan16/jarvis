@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from jarvis.pipelines.models import PipelineDef, PipelineStep
 
-
 # ---------------------------------------------------------------------------
 # Full QA Review: análisis completo de calidad
 # ---------------------------------------------------------------------------

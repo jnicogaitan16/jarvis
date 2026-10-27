@@ -165,7 +165,7 @@ class MemoryManager:
 
         lines = ["Contexto relevante de memoria:"]
         total_chars = 0
-        for record, score in results:
+        for record, _score in results:
             entry = f"- [{record.source}] {record.content}"
             if total_chars + len(entry) > max_chars:
                 break

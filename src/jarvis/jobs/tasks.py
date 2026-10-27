@@ -13,9 +13,6 @@ def run_agent_task(agent_id: str, request_data: dict) -> dict:
     bloquear la CLI o la API.
     """
     from jarvis.agents.base import AgentRequest
-    from jarvis.agents.registry import AgentRegistry
-    from jarvis.config import load_global_config
-    from jarvis.core.events import EventStore
 
     # Reconstruir request
     request = AgentRequest(**request_data)

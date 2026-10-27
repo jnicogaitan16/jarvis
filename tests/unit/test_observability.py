@@ -1,9 +1,8 @@
 """Tests para observabilidad — métricas, health checks, benchmarks."""
 
-import pytest
 
 from jarvis.observability.benchmarks import BenchmarkCase, BenchmarkRunner, BenchmarkSuiteResult
-from jarvis.observability.health import HealthCheck, _check_sqlite, _check_memory
+from jarvis.observability.health import _check_memory, _check_sqlite
 from jarvis.observability.metrics import AgentMetrics, MetricsCollector, SystemMetrics
 
 
@@ -34,8 +33,8 @@ class TestMetricsCollector:
         assert m.events_by_project["pie"] == 2
 
     def test_collect_with_memory(self, tmp_path):
-        from jarvis.memory.store import MemoryStore
         from jarvis.core.models import MemoryRecord, MemoryType
+        from jarvis.memory.store import MemoryStore
 
         db = str(tmp_path / "mem_metrics.db")
         store = MemoryStore(db_path=db)

@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Optional
-
 import typer
 from rich.console import Console
 from rich.markdown import Markdown
@@ -76,10 +74,10 @@ def _build_orchestrator():
         pass
 
     # Registrar agentes QA profesionales
-    from jarvis.agents.qa.writer_agent import WriterAgent
+    from jarvis.agents.qa.code_review_agent import CodeReviewAgent
     from jarvis.agents.qa.gherkin_agent import GherkinAgent
     from jarvis.agents.qa.test_strategy_agent import TestStrategyAgent
-    from jarvis.agents.qa.code_review_agent import CodeReviewAgent
+    from jarvis.agents.qa.writer_agent import WriterAgent
 
     registry.register(WriterAgent())
     registry.register(GherkinAgent())
@@ -302,7 +300,7 @@ def version():
 
 @app.command()
 def events(
-    project: Optional[str] = typer.Option(None, "--project", "-p", help="Filtrar por proyecto"),
+    project: str | None = typer.Option(None, "--project", "-p", help="Filtrar por proyecto"),
     limit: int = typer.Option(10, "--limit", "-n", help="Número de eventos"),
 ):
     """Ver últimos eventos del sistema."""
@@ -396,7 +394,7 @@ def analyze_pr(
         )
 
         if result.evidence:
-            console.print(f"\n[dim]Evidencias guardadas:[/dim]")
+            console.print("\n[dim]Evidencias guardadas:[/dim]")
             for path in result.evidence:
                 console.print(f"  [dim]{path}[/dim]")
 
@@ -500,7 +498,7 @@ def memory_add(
     content: str = typer.Argument(help="Contenido a recordar"),
     project: str = typer.Option("personal", "--project", "-p", help="Proyecto asociado"),
     source: str = typer.Option("user", "--source", "-s", help="Fuente del conocimiento"),
-    tag: Optional[list[str]] = typer.Option(None, "--tag", "-t", help="Tags"),
+    tag: list[str] | None = typer.Option(None, "--tag", "-t", help="Tags"),
 ):
     """Agregar un registro a la memoria."""
     from jarvis.core.models import MemoryType
@@ -520,7 +518,7 @@ def memory_add(
 @memory_app.command("search")
 def memory_search(
     query: str = typer.Argument(help="Texto a buscar"),
-    project: Optional[str] = typer.Option(None, "--project", "-p", help="Filtrar por proyecto"),
+    project: str | None = typer.Option(None, "--project", "-p", help="Filtrar por proyecto"),
     limit: int = typer.Option(5, "--limit", "-n", help="Número de resultados"),
 ):
     """Buscar en la memoria."""
@@ -555,7 +553,7 @@ def memory_search(
 @memory_app.command("list")
 def memory_list(
     project: str = typer.Option("personal", "--project", "-p", help="Proyecto"),
-    memory_type: Optional[str] = typer.Option(None, "--type", "-t", help="Tipo de memoria"),
+    memory_type: str | None = typer.Option(None, "--type", "-t", help="Tipo de memoria"),
     limit: int = typer.Option(20, "--limit", "-n", help="Número de registros"),
 ):
     """Listar registros de memoria de un proyecto."""
@@ -752,7 +750,7 @@ def plugins_scan():
     guardian = _build_guardian()
     report = guardian.scan()
 
-    console.print(f"\n[cyan]Plugin Guardian — Scan completado[/cyan]")
+    console.print("\n[cyan]Plugin Guardian — Scan completado[/cyan]")
     console.print(f"  Descubiertos: [bold]{report.total_discovered}[/bold]")
     console.print(f"  Saludables:   [green]{report.healthy}[/green]")
     console.print(f"  No saludables: [red]{report.unhealthy}[/red]")
@@ -1205,7 +1203,7 @@ def chat(
             query = user_input.split(" ", 1)[1].strip()
             results = mem.search(query, project=project, limit=5)
             if results:
-                for rec, score in results:
+                for rec, _score in results:
                     console.print(f"  [dim][{rec.source}][/dim] {rec.content[:120]}")
             else:
                 console.print("  [dim]Sin resultados.[/dim]")

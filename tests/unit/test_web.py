@@ -1,6 +1,5 @@
 """Tests para JARVIS Web — API REST y páginas."""
 
-import pytest
 from fastapi.testclient import TestClient
 
 from jarvis.web.app import app

@@ -8,7 +8,7 @@ import time
 from jarvis.agents.base import AgentRequest, AgentResult, BaseAgent
 from jarvis.agents.registry import AgentRegistry
 from jarvis.core.events import EventStore
-from jarvis.core.models import EventType, ProjectContext
+from jarvis.core.models import EventType
 from jarvis.memory.manager import MemoryManager
 
 # Patrones para detección de intención

@@ -7,6 +7,13 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from jarvis.plugins.discovery import (
+    _categorize_mcp,
+    _normalize_id,
+    _parse_mcp_list_output,
+    discover_mcp_from_permissions,
+)
+from jarvis.plugins.guardian import PluginGuardian
 from jarvis.plugins.models import (
     PluginCategory,
     PluginHealth,
@@ -15,13 +22,6 @@ from jarvis.plugins.models import (
     PluginStatus,
 )
 from jarvis.plugins.registry import PluginRegistry
-from jarvis.plugins.discovery import (
-    _categorize_mcp,
-    _normalize_id,
-    _parse_mcp_list_output,
-    discover_mcp_from_permissions,
-)
-from jarvis.plugins.guardian import PluginGuardian
 
 
 class TestPluginModels(unittest.TestCase):

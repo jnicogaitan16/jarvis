@@ -1,12 +1,10 @@
 """Tests para sistema de agentes — registry, echo agent, orchestrator."""
 
-import pytest
 
 from jarvis.agents.base import AgentRequest, AgentResult, AgentSpec, BaseAgent
 from jarvis.agents.echo import EchoAgent
 from jarvis.agents.registry import AgentRegistry
 from jarvis.core.orchestrator import Orchestrator, detect_intent
-
 
 # ---------------------------------------------------------------------------
 # Mock agent for testing

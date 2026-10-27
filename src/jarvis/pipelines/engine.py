@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import time
 
-from jarvis.agents.base import AgentRequest, BaseAgent
+from jarvis.agents.base import AgentRequest
 from jarvis.agents.registry import AgentRegistry
 from jarvis.pipelines.models import (
     PipelineDef,

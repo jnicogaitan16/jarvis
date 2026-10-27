@@ -92,7 +92,7 @@ class TestStrategyAgent(BaseAgent):
         assessment = self._evaluate_automation(text, recommendations)
 
         # Renderizar
-        lines = [f"## Estrategia de Testing\n"]
+        lines = ["## Estrategia de Testing\n"]
         lines.append(f"**Funcionalidad:** {self._extract_feature(text)}")
         lines.append(f"**Proyecto:** {project}\n")
 
@@ -113,7 +113,7 @@ class TestStrategyAgent(BaseAgent):
             lines.append(f"**{rec.test_type}** ({auto_label}) — {rec.rationale}")
 
         # Evaluación de automatización
-        lines.append(f"\n### Evaluación de Automatización\n")
+        lines.append("\n### Evaluación de Automatización\n")
         verdict = "AUTOMATIZAR" if assessment.should_automate else "MANUAL"
         lines.append(f"**Veredicto:** {verdict} (confianza: {assessment.confidence:.0%})")
         lines.append(f"**ROI estimado:** {assessment.roi_estimate}\n")
@@ -310,7 +310,7 @@ class TestStrategyAgent(BaseAgent):
 
         verdict = "SI, AUTOMATIZAR" if assessment.should_automate else "NO, MANUAL"
         lines = [
-            f"## Evaluación de Automatización\n",
+            "## Evaluación de Automatización\n",
             f"**Veredicto:** {verdict}",
             f"**Confianza:** {assessment.confidence:.0%}",
             f"**ROI estimado:** {assessment.roi_estimate}\n",
@@ -324,7 +324,7 @@ class TestStrategyAgent(BaseAgent):
         for r in assessment.reasons_against:
             lines.append(f"- {r}")
 
-        lines.append(f"\n### Recomendación de herramientas")
+        lines.append("\n### Recomendación de herramientas")
         for rec in recs:
             if rec.automate and rec.tools:
                 lines.append(f"- **{rec.test_type}:** {', '.join(rec.tools)}")

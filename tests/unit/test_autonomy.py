@@ -1,13 +1,10 @@
 """Tests para framework de autonomía y model selector."""
 
-import pytest
 
 from jarvis.core.models import OperationType, ProjectContext
 from jarvis.llm.base import TaskComplexity
-from jarvis.llm.model_selector import ModelSelector, ModelProfile, ModelSelection
+from jarvis.llm.model_selector import ModelProfile, ModelSelector
 from jarvis.security.autonomy import (
-    ApprovalPolicy,
-    ApprovalResult,
     AutonomyLevel,
     AutonomyManager,
 )

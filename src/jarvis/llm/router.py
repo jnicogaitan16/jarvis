@@ -8,7 +8,6 @@ from jarvis.core.models import ProjectContext
 from jarvis.llm.base import LLMProvider, LLMRequest, LLMResponse, ProviderStatus, TaskComplexity
 from jarvis.llm.usage import UsageTracker
 
-
 # Heurísticas simples para clasificar complejidad
 _CODE_PATTERNS = re.compile(
     r"(código|code|función|function|bug|error|debug|refactor|test|class|def |import )",
@@ -63,11 +62,10 @@ class LLMRouter:
         complexity = classify_complexity(request.prompt)
 
         # 1. Para tareas simples, preferir local (rápido)
-        if complexity == TaskComplexity.SIMPLE:
-            if "ollama" in allowed:
-                ollama = self._providers.get("ollama")
-                if ollama and ollama.is_available():
-                    return ollama
+        if complexity == TaskComplexity.SIMPLE and "ollama" in allowed:
+            ollama = self._providers.get("ollama")
+            if ollama and ollama.is_available():
+                return ollama
 
         # 2. Para tareas medio/complejas/código, preferir Claude Code si disponible
         if complexity in (TaskComplexity.MEDIUM, TaskComplexity.COMPLEX, TaskComplexity.CODE):
@@ -76,13 +74,12 @@ class LLMRouter:
                 return claude
 
         # 3. Fallback cloud: Gemini si permitido
-        if complexity in (TaskComplexity.MEDIUM, TaskComplexity.COMPLEX):
-            if context.allow_cloud:
-                for pid in ("gemini",):
-                    if pid in allowed:
-                        provider = self._providers.get(pid)
-                        if provider and provider.is_available():
-                            return provider
+        if complexity in (TaskComplexity.MEDIUM, TaskComplexity.COMPLEX) and context.allow_cloud:
+            for pid in ("gemini",):
+                if pid in allowed:
+                    provider = self._providers.get(pid)
+                    if provider and provider.is_available():
+                        return provider
 
         # 3. Fallback: intentar cualquier provider disponible (respetando políticas)
         for pid, provider in self._providers.items():

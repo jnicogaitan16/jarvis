@@ -2,7 +2,7 @@
 
 import pytest
 
-from jarvis.core.models import MemoryType, ProjectContext
+from jarvis.core.models import ProjectContext
 from jarvis.memory.manager import MemoryManager
 from jarvis.memory.store import MemoryStore
 

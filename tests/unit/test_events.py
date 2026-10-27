@@ -1,6 +1,6 @@
 """Tests para Event Stream."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from jarvis.core.events import EventStore
 from jarvis.core.models import EventType
@@ -47,7 +47,7 @@ class TestEventStore:
 
     def test_query_by_since(self, event_store: EventStore):
         event_store.emit(EventType.ACTION, {"old": True})
-        future = datetime(2099, 1, 1, tzinfo=timezone.utc)
+        future = datetime(2099, 1, 1, tzinfo=UTC)
         results = event_store.query(since=future)
         assert len(results) == 0
 

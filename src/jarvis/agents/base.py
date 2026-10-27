@@ -4,8 +4,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Any
+from datetime import UTC, datetime
 
 from jarvis.core.models import ProjectContext, _new_id
 
@@ -31,7 +30,7 @@ class AgentRequest:
     project: str = "personal"
     context: ProjectContext | None = None
     memory_context: str = ""
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
 @dataclass
@@ -71,6 +70,4 @@ class BaseAgent(ABC):
     def can_handle(self, intent: str, project: str) -> bool:
         """Verificar si este agente puede manejar la solicitud."""
         s = self.spec()
-        if s.supported_projects and project not in s.supported_projects:
-            return False
-        return True
+        return not (s.supported_projects and project not in s.supported_projects)

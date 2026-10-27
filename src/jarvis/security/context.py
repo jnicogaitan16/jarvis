@@ -37,9 +37,7 @@ class SecurityGate:
         """Verificar acceso a memoria de otro proyecto."""
         if target_project == context.memory_namespace:
             return True
-        if target_project == "system":
-            return True
-        return False
+        return target_project == "system"
 
     def sanitize_for_logging(self, text: str) -> str:
         """Redactar credenciales y datos sensibles antes de logging."""

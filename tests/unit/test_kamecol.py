@@ -1,6 +1,5 @@
 """Tests para KameCol integration — clientes, agente, modelos."""
 
-import pytest
 
 from jarvis.integrations.kamecol import (
     DashboardKPIs,
