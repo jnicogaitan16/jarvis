@@ -611,6 +611,128 @@ def memory_count():
 
 
 # ---------------------------------------------------------------------------
+# Pipeline commands
+# ---------------------------------------------------------------------------
+
+pipeline_app = typer.Typer(help="Pipelines multi-agente — orquestación de workflows.")
+app.add_typer(pipeline_app, name="pipeline")
+
+
+def _build_pipeline_engine():
+    """Construir PipelineEngine con agentes registrados."""
+    from jarvis.pipelines.engine import PipelineEngine
+    _, registry = _build_orchestrator()
+    return PipelineEngine(agent_registry=registry)
+
+
+@pipeline_app.command("list")
+def pipeline_list():
+    """Listar workflows disponibles."""
+    from jarvis.pipelines.workflows import list_workflows
+
+    workflows = list_workflows()
+    table = Table(title=f"Pipelines JARVIS ({len(workflows)})")
+    table.add_column("ID", style="cyan")
+    table.add_column("Nombre")
+    table.add_column("Pasos", justify="center")
+    table.add_column("Descripción", overflow="fold")
+    table.add_column("Tags", style="dim")
+
+    for w in workflows:
+        tags = ", ".join(w.tags) if w.tags else "—"
+        table.add_row(w.id, w.name, str(len(w.steps)), w.description, tags)
+
+    console.print(table)
+
+
+@pipeline_app.command("describe")
+def pipeline_describe(
+    workflow_id: str = typer.Argument(help="ID del workflow"),
+):
+    """Ver detalle de un workflow."""
+    from jarvis.pipelines.workflows import get_workflow
+
+    workflow = get_workflow(workflow_id)
+    if not workflow:
+        console.print(f"[red]Workflow '{workflow_id}' no encontrado.[/red]")
+        return
+
+    console.print(Panel(
+        f"[bold]{workflow.name}[/bold]\n\n{workflow.description}",
+        title=workflow.id,
+        border_style="cyan",
+    ))
+
+    table = Table(title=f"Pasos ({len(workflow.steps)})")
+    table.add_column("#", justify="center", width=3)
+    table.add_column("Agente", style="cyan")
+    table.add_column("Nombre")
+    table.add_column("Descripción", overflow="fold")
+    table.add_column("Stop on fail", justify="center", width=12)
+
+    for i, step in enumerate(workflow.steps, 1):
+        stop = "[red]Sí[/red]" if step.stop_on_fail else "[dim]No[/dim]"
+        table.add_row(str(i), step.agent_id, step.name, step.description, stop)
+
+    console.print(table)
+
+
+@pipeline_app.command("run")
+def pipeline_run(
+    workflow_id: str = typer.Argument(help="ID del workflow a ejecutar"),
+    input_text: str = typer.Argument(help="Texto de entrada para el pipeline"),
+    project: str = typer.Option("personal", "--project", "-p", help="Proyecto"),
+):
+    """Ejecutar un pipeline multi-agente."""
+    from jarvis.pipelines.workflows import get_workflow
+
+    workflow = get_workflow(workflow_id)
+    if not workflow:
+        console.print(f"[red]Workflow '{workflow_id}' no encontrado.[/red]")
+        console.print("[dim]Usa 'jarvis pipeline list' para ver workflows disponibles.[/dim]")
+        return
+
+    engine = _build_pipeline_engine()
+
+    console.print(f"\n[cyan]Pipeline: {workflow.name}[/cyan]")
+    console.print(f"[dim]{len(workflow.steps)} pasos | Proyecto: {project}[/dim]\n")
+
+    result = engine.execute(workflow, input_text, project=project)
+
+    # Mostrar resultado de cada step
+    for i, step in enumerate(result.steps, 1):
+        if step.status == "completed":
+            icon = "[green]OK[/green]"
+        elif step.status == "failed":
+            icon = "[red]FAIL[/red]"
+        elif step.status == "skipped":
+            icon = "[yellow]SKIP[/yellow]"
+        else:
+            icon = "[dim]?[/dim]"
+
+        console.print(f"  {icon} [{i}/{len(result.steps)}] {step.step_name} ({step.duration_ms}ms)")
+
+    console.print()
+
+    # Mostrar contenido de cada step completado
+    for step in result.steps:
+        if step.status == "completed" and step.content:
+            console.print(Panel(
+                step.content[:2000],
+                title=f"{step.step_name} ({step.agent_id})",
+                subtitle=f"{step.duration_ms}ms",
+                border_style="green" if step.status == "completed" else "red",
+            ))
+
+    # Resumen final
+    status_text = "[green]Exitoso[/green]" if result.success else "[red]Fallido[/red]"
+    console.print(
+        f"\n{status_text} — {result.completed_steps}/{len(result.steps)} pasos "
+        f"| {result.total_duration_ms}ms total"
+    )
+
+
+# ---------------------------------------------------------------------------
 # Plugin Guardian commands
 # ---------------------------------------------------------------------------
 
