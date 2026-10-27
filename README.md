@@ -1,141 +1,144 @@
 # JARVIS
 
-**Plataforma personal de inteligencia artificial híbrida con agentes especializados, memoria persistente y ejecución verificable.**
+**Plataforma personal de IA con agentes QA profesionales, orquestación multi-agente y ejecución verificable.**
 
-## Visión
+![CI](https://github.com/jnicogaitan16/jarvis/actions/workflows/ci.yml/badge.svg)
 
-JARVIS es una plataforma modular que coordina agentes inteligentes para automatizar y asistir en tareas de desarrollo de software, QA, e-commerce y análisis de información. No es un chatbot: es un sistema operativo de agentes con capacidades reales, trazabilidad y control humano.
+## Qué es JARVIS
+
+JARVIS coordina agentes inteligentes para automatizar QA, análisis de código, e-commerce y gestión de proyectos. No es un chatbot: es un sistema de agentes con capacidades reales, pipelines compuestos y control humano.
+
+## Agentes (7)
+
+| Agente | ID | Capacidad |
+|--------|----|-----------|
+| **QA Writer** | `qa.writer` | Bug reports, preguntas a DEV, notificaciones al equipo, hallazgos de revisión |
+| **Gherkin Generator** | `qa.gherkin` | Escenarios BDD completos: happy path, validaciones, errores, seguridad |
+| **Test Strategy Planner** | `qa.strategy` | Planifica tipos de testing, evalúa si automatizar con ROI estimado |
+| **Code Review Agent** | `qa.code_review` | Análisis estático: credenciales, eval, SQL injection, complejidad |
+| **QA Analyzer** | `qa.analyzer` | Pipeline completo de análisis de PRs (via IAAgent) |
+| **KameCol Agent** | `biz.kamecol` | Catálogo, pedidos, dashboard KPIs, recuperación de pagos |
+| **Echo Agent** | `core.echo` | Fallback para solicitudes generales |
+
+## Pipelines Multi-Agente (4)
+
+| Pipeline | Pasos | Uso |
+|----------|-------|-----|
+| `full_qa_review` | 4 | Code review + Gherkin + Strategy + Writer |
+| `feature_planning` | 2 | Gherkin + Strategy |
+| `security_audit` | 2 | Code review + Writer |
+| `bug_triage` | 3 | Writer + Code review + Strategy |
+
+## Plugins (10)
+
+| Plugin | Categoría | Estado |
+|--------|-----------|--------|
+| **Playwright MCP** | QA | Connected |
+| **GitHub MCP** | DevOps | Connected |
+| Claude Docs | Docs | Connected |
+| Google Drive | Docs | Connected |
+| Mixpanel | Analytics | Connected |
+| mysql-qa | Database | Connected |
+| mysql-prod | Database | Connected |
+| Warp | General | Enabled |
+| monday.com | General | Needs auth |
+| Jam | QA | Needs auth |
 
 ## Proyectos integrados
 
-| Proyecto | Dominio | Stack | Integración |
-|----------|---------|-------|-------------|
-| **IntegratePIE** | Educación especial (Chile) | PHP/Laravel, MySQL, Azure | QA Intelligence, análisis de PRs |
-| **IAAgent** | QA automatizado | Python, Typer, Azure DevOps | Módulo QA reutilizable |
-| **KameCol** | E-commerce streetwear (Colombia) | Django/DRF, Next.js, PostgreSQL | Atención al cliente, automatización comercial |
-
-## Arquitectura
-
-```
-USUARIO
-   │
-   ▼
-JARVIS CLI / API (FastAPI)
-   │
-   ▼
-JARVIS CORE
-   ├── Router ──────── Clasifica y delega solicitudes
-   ├── Memory ─────── Recupera contexto persistente
-   └── Job Engine ──── Ejecuta tareas en background (Huey/SQLite)
-         │
-         ▼
-   AGENT MANAGER
-   ├── QA Agent ────── Análisis de PRs, test cases, evidencias
-   ├── Dev Agent ───── Análisis de código, arquitectura
-   └── Biz Agent ───── Atención al cliente, métricas comerciales
-         │
-         ▼
-   TOOL LAYER
-   ├── Azure DevOps ── Work items, PRs, pipelines
-   ├── Playwright ──── Automatización de navegador
-   ├── Git ─────────── Repositorios, diffs, análisis
-   └── APIs ────────── KameCol, IntegratePIE (solo lectura)
-         │
-         ▼
-   EVIDENCE & AUDIT ── Logs, resultados, capturas, trazabilidad
-```
-
-## Stack tecnológico
-
-| Componente | Tecnología |
-|-----------|-----------|
-| Lenguaje | Python 3.12+ |
-| API | FastAPI |
-| Jobs | Huey (SQLite backend) |
-| Persistencia | SQLite → PostgreSQL + pgvector |
-| IA local | Ollama (Qwen 2.5, CodeQwen) |
-| IA cloud | Gemini API (intercambiable, proveedor extensible) |
-| QA | Playwright MCP |
-| Tests | pytest |
-| Interfaz | CLI + API REST (web posterior) |
-
-## Estado del proyecto
-
-**Fase actual: 1 — JARVIS Core** (en progreso)
-
-- [x] Fase 0 — Investigación y arquitectura
-- [x] Fase 1 — Core: CLI, Event Stream, Config, Security, Tests (53 tests, 97% cobertura)
-- [ ] Fase 2 — Motor de IA híbrida (Ollama + Gemini)
-- [ ] Fase 3 — Memoria persistente [MVP]
-
-## Documentación
-
-```
-docs/
-├── planning/
-│   ├── MASTER-PLAN.md          # Plan maestro integral
-│   ├── ROADMAP.md              # Fases de desarrollo
-│   ├── BACKLOG.md              # Backlog técnico priorizado
-│   └── MVP-SCOPE.md            # Alcance del MVP
-├── architecture/
-│   ├── SYSTEM-ARCHITECTURE.md  # Arquitectura del sistema
-│   ├── AGENT-ARCHITECTURE.md   # Catálogo de agentes
-│   ├── MEMORY-ARCHITECTURE.md  # Sistema de memoria persistente
-│   ├── HYBRID-AI-ARCHITECTURE.md # Estrategia IA híbrida
-│   ├── INTEGRATION-ARCHITECTURE.md # Integraciones externas
-│   └── SECURITY-ARCHITECTURE.md    # Seguridad y aislamiento
-├── research/
-│   ├── GITHUB-REFERENCES.md        # Investigación de proyectos OSS
-│   ├── IAAGENT-REUSE-ASSESSMENT.md # Evaluación de reutilización
-│   └── AUDIT-CONSOLIDATION.md      # Análisis transversal de auditorías
-├── decisions/
-│   └── ADR-001-IAAGENT-STRATEGY.md # Decisión sobre IAAgent
-└── execution/
-    └── PHASE-01-IMPLEMENTATION-PLAN.md # Plan de la primera fase
-```
-
-## Auditorías base
-
-- `docs/audits/integratepie-auditoria.md` — Auditoría técnica de IntegratePIE
-- `docs/audits/iaAgent-auditoria.md` — Auditoría técnica de IAAgent
-- `docs/audits/kame.colStore-auditoria.md` — Auditoría técnica de KameCol
+| Proyecto | Dominio | Integración |
+|----------|---------|-------------|
+| **IntegratePIE** | Educación especial (Chile) | QA Intelligence, análisis de PRs, Azure DevOps |
+| **IAAgent** | QA automatizado | Motor de análisis de PRs reutilizable |
+| **KameCol** | E-commerce streetwear (Colombia) | API, DB producción, dashboard KPIs |
 
 ## Quickstart
 
 ```bash
-# Crear entorno virtual
+# Instalar
 python3 -m venv .venv
 source .venv/bin/activate
-
-# Instalar JARVIS
 pip install -e ".[dev]"
 
 # Verificar
 jarvis version
-jarvis ask "hola"
 jarvis status
+jarvis agents
+
+# Usar agentes
+jarvis run "escribe un bug report: el login falla con contraseña vacía"
+jarvis run "gherkin para el checkout de pagos"
+jarvis run "estrategia de testing para el API de órdenes"
+jarvis run "code review: api_key = 'secret123'"
+
+# Pipelines
+jarvis pipeline list
+jarvis pipeline run feature_planning "login con email y contraseña"
+jarvis pipeline run full_qa_review "endpoint API de pagos"
+
+# Plugins
+jarvis plugins scan
+jarvis plugins health
 
 # Tests
-pytest tests/ -v
+make test
+make lint
 ```
 
-## Principios de diseño
+## Makefile
 
-1. **Modularidad** — Nuevos agentes y proyectos sin reconstruir el núcleo
-2. **Independencia** — Cada proyecto conserva su propio repositorio
-3. **IA híbrida** — Modelos locales + cloud + herramientas deterministas
-4. **Memoria persistente** — Recuperar información sin repetir contexto
-5. **Seguridad por defecto** — Permisos mínimos, aislamiento de proyectos
-6. **Trazabilidad** — Cada ejecución genera evidencias verificables
-7. **Control humano** — Aprobación requerida para operaciones con efectos externos
+```bash
+make install    # Crear venv + instalar deps
+make lint       # Ruff linter
+make test       # pytest (331 tests)
+make test-cov   # pytest + coverage
+make serve      # Web dashboard (localhost:8000)
+make plugins    # Escanear plugins
+make build      # Docker build
+make up         # Docker compose up
+```
 
-## Requisitos de infraestructura
+## Arquitectura
+
+```
+CLI / Web Dashboard (FastAPI)
+        |
+   Orchestrator --> Intent Detection --> Agent Registry
+        |
+   PipelineEngine --> Step 1 --> Step 2 --> Step N
+        |                (contexto compartido)
+   7 Agentes (QA Writer, Gherkin, Strategy, Code Review, QA Analyzer, KameCol, Echo)
+        |
+   Plugin Guardian --> 10 MCP Servers (Playwright, GitHub, MySQL, Mixpanel, ...)
+        |
+   Memory (SQLite + FTS5) | Events (append-only) | LLM Router (Ollama/Gemini/Claude)
+```
+
+## CI/CD
+
+- **GitHub Actions**: lint (ruff) + tests (pytest) + coverage en push/PR a main
+- **Docker**: Dockerfile + docker-compose para deploy containerizado
+- **Linting**: ruff con reglas de seguridad (bandit), naming, imports, bugbear
+
+## Stack
+
+| Componente | Tecnología |
+|-----------|-----------|
+| Lenguaje | Python 3.12+ |
+| CLI | Typer + Rich |
+| API | FastAPI + Uvicorn |
+| Testing | pytest (331 tests, 63% coverage) |
+| Linting | ruff |
+| CI/CD | GitHub Actions |
+| Container | Docker |
+| Base de datos | SQLite (FTS5) |
+| MCP Servers | Playwright, GitHub, MySQL, Mixpanel, Google Drive, Claude Docs |
+
+## Infraestructura
 
 - Mac mini Apple Silicon M4, 16 GB RAM
-- macOS, Docker, Git
-- Ollama para modelos locales
-- Cursor, GPT Plus / Codex (herramientas de desarrollo)
-- Python 3.12+ con entorno virtual
+- Claude Code como motor principal
+- Acceso remoto: Tailscale + SSH desde iPhone
 
 ## Licencia
 
