@@ -35,6 +35,9 @@ _MCP_CATEGORIES: dict[str, PluginCategory] = {
     "sonarqube": PluginCategory.QA,
     "postman": PluginCategory.QA,
     "semgrep": PluginCategory.SECURITY,
+    "jenkins": PluginCategory.DEVOPS,
+    "docker": PluginCategory.DEVOPS,
+    "shopify": PluginCategory.ECOMMERCE,
 }
 
 
