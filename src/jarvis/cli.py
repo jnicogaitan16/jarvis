@@ -858,18 +858,6 @@ def serve(
 
 
 @app.command()
-def telegram():
-    """Iniciar bot de Telegram para control remoto desde iPhone."""
-    from jarvis.telegram.bot import create_bot
-
-    console.print("[cyan]JARVIS Telegram Bot iniciando...[/cyan]")
-    console.print("[dim]Envía /start al bot en Telegram para comenzar.[/dim]")
-
-    bot = create_bot()
-    bot.run_polling()
-
-
-@app.command()
 def chat(
     project: str = typer.Option("personal", "--project", "-p", help="Proyecto"),
 ):
