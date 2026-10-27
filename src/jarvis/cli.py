@@ -600,6 +600,165 @@ def memory_count():
 
 
 # ---------------------------------------------------------------------------
+# Plugin Guardian commands
+# ---------------------------------------------------------------------------
+
+plugins_app = typer.Typer(help="Plugin Guardian — descubrir, validar y monitorear plugins.")
+app.add_typer(plugins_app, name="plugins")
+
+
+def _build_guardian():
+    """Construir Plugin Guardian."""
+    from jarvis.plugins.guardian import PluginGuardian
+    return PluginGuardian()
+
+
+@plugins_app.command("scan")
+def plugins_scan():
+    """Escanear y descubrir todos los plugins instalados."""
+    guardian = _build_guardian()
+    report = guardian.scan()
+
+    console.print(f"\n[cyan]Plugin Guardian — Scan completado[/cyan]")
+    console.print(f"  Descubiertos: [bold]{report.total_discovered}[/bold]")
+    console.print(f"  Saludables:   [green]{report.healthy}[/green]")
+    console.print(f"  No saludables: [red]{report.unhealthy}[/red]")
+
+    if report.new_plugins:
+        console.print(f"\n  [green]Nuevos:[/green] {', '.join(report.new_plugins)}")
+    if report.lost_plugins:
+        console.print(f"  [red]Perdidos:[/red] {', '.join(report.lost_plugins)}")
+
+    # Tabla de plugins
+    specs = guardian.registry.list_all()
+    if specs:
+        table = Table(title=f"Plugins ({len(specs)})")
+        table.add_column("ID", style="cyan")
+        table.add_column("Nombre")
+        table.add_column("Fuente", style="dim")
+        table.add_column("Categoría")
+        table.add_column("Estado", justify="center")
+        table.add_column("Detalle", style="dim", overflow="fold")
+
+        for spec in specs:
+            health = guardian.registry.get_health(spec.id)
+            if health and health.status == "healthy":
+                status_icon = "[green]OK[/green]"
+            elif health and health.status == "unhealthy":
+                status_icon = "[red]FAIL[/red]"
+            else:
+                status_icon = "[yellow]?[/yellow]"
+
+            detail = health.detail if health else ""
+            table.add_row(
+                spec.id, spec.name, spec.source.value,
+                spec.category.value, status_icon, detail,
+            )
+
+        console.print(table)
+
+    # Servidores MCP en permisos
+    if report.permission_servers:
+        console.print(f"\n[dim]MCP servers en permisos locales: {', '.join(report.permission_servers)}[/dim]")
+
+    # Validación
+    issues = guardian.validate()
+    if issues:
+        console.print(f"\n[yellow]Problemas detectados ({len(issues)}):[/yellow]")
+        for issue in issues:
+            console.print(f"  [yellow]![/yellow] {issue}")
+
+
+@plugins_app.command("list")
+def plugins_list():
+    """Listar plugins descubiertos (ejecuta scan si no hay datos)."""
+    guardian = _build_guardian()
+    guardian.scan()
+
+    specs = guardian.registry.list_all()
+    if not specs:
+        console.print("[dim]Sin plugins detectados. Ejecuta 'jarvis plugins scan'.[/dim]")
+        return
+
+    table = Table(title=f"Plugins JARVIS ({len(specs)})")
+    table.add_column("ID", style="cyan")
+    table.add_column("Nombre")
+    table.add_column("Fuente", style="dim")
+    table.add_column("Categoría")
+    table.add_column("Versión", style="dim")
+    table.add_column("Estado", justify="center")
+
+    for spec in specs:
+        health = guardian.registry.get_health(spec.id)
+        if health and health.status == "healthy":
+            status_icon = "[green]OK[/green]"
+        elif health and health.status == "unhealthy":
+            status_icon = "[red]FAIL[/red]"
+        else:
+            status_icon = "[yellow]?[/yellow]"
+
+        table.add_row(
+            spec.id, spec.name, spec.source.value,
+            spec.category.value, spec.version or "—", status_icon,
+        )
+
+    console.print(table)
+
+
+@plugins_app.command("health")
+def plugins_health():
+    """Verificar salud de todos los plugins."""
+    guardian = _build_guardian()
+    guardian.scan()
+
+    health_list = guardian.registry.all_health()
+    if not health_list:
+        console.print("[dim]Sin plugins para verificar.[/dim]")
+        return
+
+    table = Table(title="Plugin Health Check")
+    table.add_column("Plugin", style="cyan")
+    table.add_column("Estado", justify="center", width=8)
+    table.add_column("Detalle", overflow="fold")
+    table.add_column("Verificado", style="dim")
+
+    for h in health_list:
+        if h.status == "healthy":
+            icon = "[green]OK[/green]"
+        elif h.status == "unhealthy":
+            icon = "[red]FAIL[/red]"
+        elif h.status == "not_installed":
+            icon = "[red]GONE[/red]"
+        else:
+            icon = "[yellow]?[/yellow]"
+
+        checked = h.checked_at.strftime("%H:%M:%S") if h.checked_at else "—"
+        table.add_row(h.plugin_id, icon, h.detail, checked)
+
+    console.print(table)
+
+    healthy = guardian.registry.healthy_count()
+    total = len(health_list)
+    console.print(f"\n  [green]{healthy}[/green]/{total} saludables")
+
+
+@plugins_app.command("validate")
+def plugins_validate():
+    """Validar consistencia entre plugins y permisos del proyecto."""
+    guardian = _build_guardian()
+    guardian.scan()
+    issues = guardian.validate()
+
+    if not issues:
+        console.print("[green]Sin problemas detectados.[/green]")
+        return
+
+    console.print(f"[yellow]Problemas detectados ({len(issues)}):[/yellow]")
+    for issue in issues:
+        console.print(f"  [yellow]![/yellow] {issue}")
+
+
+# ---------------------------------------------------------------------------
 # Observability commands
 # ---------------------------------------------------------------------------
 
