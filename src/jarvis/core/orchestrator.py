@@ -14,7 +14,11 @@ from jarvis.memory.manager import MemoryManager
 # Patrones para detección de intención
 _INTENT_PATTERNS: list[tuple[str, re.Pattern]] = [
     ("analyze_pr", re.compile(r"(analiz|review|revis).*(pr|pull.?request|merge)", re.I)),
-    ("qa", re.compile(r"(test|prueba|qa|quality|calidad|gherkin|caso.?de.?prueba)", re.I)),
+    ("gherkin", re.compile(r"(gherkin|bdd|scenario|escenario.*prueba|feature.*test)", re.I)),
+    ("write", re.compile(r"(escrib|redact|bug.?report|notific|comentario|report.*bug)", re.I)),
+    ("test_strategy", re.compile(r"(estrategia.*test|plan.*prueba|automa.*test|vale.*pena.*autom|conviene.*autom)", re.I)),
+    ("code_review", re.compile(r"(code.?review|revis.*código|análisis.*estático|static.*analy|code.?smell)", re.I)),
+    ("qa", re.compile(r"(test|prueba|qa|quality|calidad|caso.?de.?prueba)", re.I)),
     ("code", re.compile(r"(código|code|función|class|bug|debug|refactor)", re.I)),
     ("memory", re.compile(r"(recuerd|memori|qué sab|what.*know|histori)", re.I)),
     ("status", re.compile(r"(status|estado|cómo va|health)", re.I)),

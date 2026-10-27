@@ -75,6 +75,17 @@ def _build_orchestrator():
     except Exception:
         pass
 
+    # Registrar agentes QA profesionales
+    from jarvis.agents.qa.writer_agent import WriterAgent
+    from jarvis.agents.qa.gherkin_agent import GherkinAgent
+    from jarvis.agents.qa.test_strategy_agent import TestStrategyAgent
+    from jarvis.agents.qa.code_review_agent import CodeReviewAgent
+
+    registry.register(WriterAgent())
+    registry.register(GherkinAgent())
+    registry.register(TestStrategyAgent())
+    registry.register(CodeReviewAgent())
+
     # Registrar KameCol Agent
     from jarvis.agents.business.kamecol_agent import KameColAgent
     registry.register(KameColAgent())

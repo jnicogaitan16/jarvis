@@ -106,7 +106,7 @@ class TestDetectIntent:
 
     def test_qa(self):
         assert detect_intent("genera casos de prueba") == "qa"
-        assert detect_intent("escenarios gherkin") == "qa"
+        assert detect_intent("escenarios gherkin") == "gherkin"  # intent específico
 
     def test_code(self):
         assert detect_intent("hay un bug en la función") == "code"
