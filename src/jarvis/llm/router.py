@@ -2,11 +2,20 @@
 
 from __future__ import annotations
 
+import logging
 import re
 
 from jarvis.core.models import ProjectContext
 from jarvis.llm.base import LLMProvider, LLMRequest, LLMResponse, ProviderStatus, TaskComplexity
 from jarvis.llm.usage import UsageTracker
+from jarvis.security.context import SecurityGate
+
+logger = logging.getLogger(__name__)
+
+# Providers que envían datos fuera de la red local
+_CLOUD_PROVIDERS: frozenset[str] = frozenset({"gemini"})
+# Providers que se ejecutan localmente
+_LOCAL_PROVIDERS: frozenset[str] = frozenset({"ollama", "claude_code"})
 
 # Heurísticas simples para clasificar complejidad
 _CODE_PATTERNS = re.compile(
@@ -40,6 +49,7 @@ class LLMRouter:
     ):
         self._providers: dict[str, LLMProvider] = providers or {}
         self._usage = usage_tracker
+        self._security_gate = SecurityGate()
 
     def register(self, provider: LLMProvider) -> None:
         """Registrar un proveedor."""
@@ -91,6 +101,70 @@ class LLMRouter:
             f"Permitidos: {list(allowed)}"
         )
 
+    def _sanitize_request(
+        self,
+        request: LLMRequest,
+        provider_id: str,
+        context: ProjectContext,
+    ) -> LLMRequest:
+        """Sanitizar prompt y system según el tipo de provider y políticas del proyecto.
+
+        - Cloud providers (Gemini): aplica sanitize_for_cloud (más agresivo)
+        - Local providers (Ollama, Claude Code): aplica sanitize_for_logging (menos agresivo)
+        - Si allow_pii_to_cloud=True y el provider es cloud, solo sanitiza credenciales
+        """
+        is_cloud = provider_id in _CLOUD_PROVIDERS
+
+        if is_cloud and not context.allow_pii_to_cloud:
+            # Cloud + PII no permitido: sanitización completa
+            sanitized_prompt = self._security_gate.sanitize_for_cloud(
+                request.prompt, context,
+            )
+            sanitized_system = self._security_gate.sanitize_for_cloud(
+                request.system, context,
+            ) if request.system else ""
+            level = "cloud"
+        elif is_cloud:
+            # Cloud + PII permitido: solo credenciales
+            sanitized_prompt = self._security_gate.sanitize_for_logging(request.prompt)
+            sanitized_system = self._security_gate.sanitize_for_logging(
+                request.system,
+            ) if request.system else ""
+            level = "cloud-pii-allowed"
+        else:
+            # Local: solo credenciales
+            sanitized_prompt = self._security_gate.sanitize_for_logging(request.prompt)
+            sanitized_system = self._security_gate.sanitize_for_logging(
+                request.system,
+            ) if request.system else ""
+            level = "local"
+
+        # Log solo si hubo cambios (para auditoría)
+        prompt_changed = sanitized_prompt != request.prompt
+        system_changed = sanitized_system != request.system
+        if prompt_changed or system_changed:
+            fields = []
+            if prompt_changed:
+                fields.append("prompt")
+            if system_changed:
+                fields.append("system")
+            logger.info(
+                "SecurityGate sanitized [%s] for provider=%s project=%s level=%s",
+                ", ".join(fields),
+                provider_id,
+                context.project_id,
+                level,
+            )
+
+        # LLMRequest es frozen, crear nueva instancia con campos sanitizados
+        return LLMRequest(
+            prompt=sanitized_prompt,
+            system=sanitized_system,
+            max_tokens=request.max_tokens,
+            temperature=request.temperature,
+            project=request.project,
+        )
+
     def generate(
         self,
         request: LLMRequest,
@@ -114,7 +188,11 @@ class LLMRouter:
                 continue
             tried.append(provider.provider_id)
             try:
-                response = provider.generate(request)
+                # Sanitizar request según el provider y políticas del proyecto
+                sanitized_request = self._sanitize_request(
+                    request, provider.provider_id, context,
+                )
+                response = provider.generate(sanitized_request)
                 if self._usage:
                     self._usage.record(
                         response,
