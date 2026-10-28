@@ -19,6 +19,9 @@ ENV/
 # Data (local databases, evidence, knowledge)
 data/
 
+# Workspace (LLM cache, enrichments)
+workspace/
+
 # IDE
 .vscode/
 .idea/
